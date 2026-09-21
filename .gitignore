@@ -1,0 +1,19 @@
+# Local pointer to the Quetzal installation (see README.md)
+.quetzal_path
+
+# Working material that must not be published: photographs of installed piping,
+# client drawings, site models. See AGENTS.md.
+private/
+
+__pycache__/
+*.py[cod]
+
+# FreeCAD backups and lock files
+*.FCStd1
+*.FCBak
+.FCStd.lock
+
+.vs/
+*.vsidx
+.idea/
+.DS_Store
