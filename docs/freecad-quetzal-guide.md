@@ -189,11 +189,14 @@ part; you usually create at the origin and snap with `alignTwoPorts` afterward.
 | Outlet | `makeOutlet(propList, pos, rot, carrierOD)` | `[rating, DN, OD, thk, A, B, endType, angle, E]` (see §3.1) |
 | Valve | `makeValve(propList, pos, Z, flgPropList, actuator)` | see §3.2 (flanged: body + BL-flange list) |
 | Socket cap | `makeSocketCap(propList, pos, Z)` | `[DN, OD, A, C, E, Conn]` — maps 1:1 onto `Cap_<class>_SW.csv`; mates via port **0** |
+| Socket ell | `makeSocketElbow(propList, pos, Z, rating)` | `[DN, OD, BA, A, C, D, E, G, Conn]` (§3.3) |
+| Socket tee | `makeSocketTee(propList, pos, Z, insertOnBranch, rating)` | `[DN, DN2, OD, OD2, A, C, D, E, G, Conn]` (§3.3) |
+| Socket coupling | `makeSocketCoupling(propList, pos, Z)` | `[DN, DN2, OD, OD2, A, C, D, E, Conn]` — reducing rows included (§3.3) |
+| Socket union | `makeSocketUnion(propList, pos, Z)` | `[DN, OD, A, C, D, E, Conn]` (§3.3) |
 
 > **This table is NOT exhaustive, and a substitution is a claim you must verify.**
-> `pCmd.py` also carries `makeSocketEll`, `makeSocketTee`, `makeSocketCoupling`,
-> `makeSocketUnion` and more. A socket cap is the trap for the unwary: `makeCap`'s
-> propList is `[DN, OD, thk]`, which does not fit `Cap_3000lb_SW.csv`'s
+> A socket cap is the trap for the unwary: `makeCap`'s propList is
+> `[DN, OD, thk]`, which does not fit `Cap_3000lb_SW.csv`'s
 > `PSize;OD;A;C;E;Conn` — but that mismatch is not grounds for shipping a
 > butt-weld cap and a "no table fits" note, because `makeSocketCap` maps onto
 > those columns exactly. **Before you write the words "no exact table/maker
@@ -358,6 +361,58 @@ along `+X` with its gearbox up is
 sets the flow axis and lets the roll fall where it may. This is cosmetic-looking
 but obvious in the model, and it is the kind of thing a user notices immediately.
 
+### 3.3 Socket-weld fittings (the 3000# SW family)
+
+`makeSocketElbow`, `makeSocketTee`, `makeSocketCoupling`, `makeSocketUnion` and
+`makeSocketCap` cover the socket families tabulated as
+`<Fitting>_{3000,6000,9000}lb_SW.csv`. Each propList maps **1:1 onto its CSV row
+in column order**, so there is nothing to compute:
+
+| File | Columns = propList |
+|---|---|
+| `Elbow_3000lb_SW.csv` | `PSize;OD;BendAngle;A;C;D;E;G;Conn` |
+| `Tee_3000lb_SW.csv` | `PSize;PSizeBranch;OD;OD2;A;C;D;E;G;Conn` |
+| `Coupling_3000lb_SW.csv` | `PSize;PSize2;OD;OD2;A;C;D;E;Conn` |
+| `Union_3000lb_SW.csv` | `PSize;OD;A;C;D;E;Conn` — **no header row** (§6) |
+
+`A` is centre-to-face, **`E` is centre-to-socket-bottom**, `D` the bore, `C` the
+socket boss wall, `G` the inner body wall. Pass `rating="3000lb"` and set
+`PRating` afterwards, as for every other maker (Golden Rule 6).
+
+**The ports sit at the bottom of the socket pocket, not at the fitting face.**
+
+- **SocketEll:** `Ports = [(E,0,0), (−E·cosBA, E·sinBA, 0)]`, outward dirs
+  `(1,0,0)` and `(−cosBA, sinBA, 0)`; **work point at the local origin.** This
+  is a *different* local frame from the butt-weld `Elbow`, whose port 0 is at
+  `(0,BR,0)` — do not carry an orientation helper across from one to the other.
+- **SocketTee:** `Ports = [(0,0,−E), (0,0,E), (0,E,0)]` — run on local ∓Z/±Z
+  (ports 0/1), branch on local +Y (port 2), work point at the local origin. Same
+  tidy frame as the butt-weld `Tee`, so the three-axis
+  `Rotation(xdir, ydir, zdir)` places it directly (§9.3).
+- **SocketCoupling / SocketUnion:** `Ports = [(0,0,−(A−E)), (0,0,A−E)]`, centre
+  at the local origin, overall length `2A`. On a *reducing* coupling port 0 is
+  the `PSize` end and port 1 the `PSize2` end — orient it deliberately, because
+  getting it backwards is invisible in a wireframe.
+
+Two things to exploit and one to report:
+
+1. **Span the ports and you get the true cut length, engagement included.** A
+   pipe built as `(portA_world − portB_world).Length` runs socket-bottom to
+   socket-bottom, which is exactly what the fabricator cuts. That is what lets
+   §9.2's "place at work points, derive the pipes" survive a change of fitting
+   class (§12.8).
+2. **`makeSocketElbow` drops port 0 at `pos`, not the work point.** It rotates
+   port 0's local direction onto `Z`, then translates so port 0 lands at `pos` —
+   unlike `makeElbow`, whose `pos` *is* the work point. When placing by work
+   point, ignore the `pos`/`Z` arguments and set `.Placement` yourself after a
+   `recompute()`.
+3. **The tables are thin in places, and that is a report item, not a bug.** A
+   reducing coupling row carries a *single* `A` and `E`, so the small end is
+   modelled with the large end's socket depth; and `Union_3000lb_SW.csv`'s DN15
+   row repeats the coupling's dimensions, so the modelled union is
+   coupling-length and visibly shorter than a real one. Say so rather than
+   letting the user find it.
+
 ---
 
 ## 4. Flanges (the tricky one)
@@ -495,6 +550,17 @@ and indexed **together**:
 idx = [s.strip() for s in row["PSize2"].split(">")].index("DN80")
 OD2, thk2 = float(row["OD2"].split(">")[idx]), float(row["thk2"].split(">")[idx])
 ```
+
+**Some tables need a two-column key.** `Tee_*.csv` is keyed on `PSize` +
+`PSizeBranch`, and `Coupling_*_SW.csv` on `PSize` + `PSize2`. A lookup on
+`PSize` alone silently returns the first row for that size — which in
+`Coupling_3000lb_SW.csv` for DN20 is the straight DN20×DN20, *not* the DN20×DN15
+reducer you asked for, because the reducing rows sit after all the straight
+ones. Match on every key column.
+
+**And one table has no header row at all.** `Union_<class>_SW.csv` starts
+straight in on data, so `csv.DictReader` eats the first size as the header and
+every later lookup misses. Read it positionally against `PSize;OD;A;C;D;E;Conn`.
 
 **Read every column by name with a default**, because column sets differ between
 files of the same family (§4). A tolerant accessor is worth the six lines:
@@ -780,6 +846,13 @@ the outlet/branch points**, so set the orientation explicitly instead.
 > ```python
 > assert abs(inlet_dir.getAngle(outlet_dir) - math.radians(180 - BA)) < 1e-6
 > ```
+>
+> **Mind which convention you are in.** That form compares the *outward* inlet
+> direction against the outgoing **leg** direction. If instead you are handing
+> `rot_two` two *outward port* directions — which is what `PortDirections`
+> gives you — the two must be exactly `BA` apart, not `180 − BA`. Write the
+> assert against the same vectors you pass to `rot_two`, or it encodes the wrong
+> convention and passes on a route that is wrong.
 >
 > This is a fast, decisive test on a candidate route, and it costs nothing to run
 > before any build code exists. A 45° elbow proposed between two legs that are
@@ -1351,6 +1424,40 @@ diameter change off apparent width where the pipe is lit against a pale
 background — pale gravel and white cladding defeat a brightness threshold, and
 the "edge" you find will be the ground shadow.
 
+#### 12.3.2 A tape measure in the shot beats every other scale
+
+If the photographer laid a tape along the run, stop scaling from catalogue
+dimensions — you have real dimensions, and they are **absolute stations** rather
+than spans. `examples/photo_example/` is the worked case: the tape is hooked
+over the cut end of the black 3/4" pipe in `dimension_2.png` and read again,
+further along the same run, in `dimension_1.png`, so every fitting on both
+sheets shares one datum and the chain falls out by subtraction.
+
+- **Confirm the datum is shared before relying on it.** Two shots of one tape is
+  the normal case, but a photographer who re-hooked between shots gives you two
+  local spans instead. That is one question, and it changes every station.
+- **Read the tape at magnification (§9.1.1), interpolating between two labelled
+  inch ticks** rather than off one. On a tape read right-to-left the digits are
+  upside-down, and `6`/`9` and `3`/`8` are exactly as ambiguous as on an iso.
+- **Expect ±1/4" from parallax alone.** The tape lies on the ground; the
+  centreline you want is half a diameter above it, and the camera is not
+  overhead. Quote that error bar.
+- **A dimension shot may show a different state of the assembly.** In
+  `dimension_2.png` the 3/4" tee's branch is a bare nipple, while the annotated
+  overview shows that branch carrying an ell and a second nipple. Take
+  *stations* from the dimension shots and *topology* from the overview.
+
+**Then use the tape to calibrate the overview photo** — the closure check
+(§9.1.2) a photo package otherwise lacks entirely. Two tape-measured spans
+appearing in the same wide shot give two independent px/inch figures; in the
+worked example they came out 39.2 and 57.1 px/in over the far and near halves,
+a 46% spread that is pure perspective. That spread is itself evidence the two
+dimension shots share a datum, and fitting px/inch linearly along the run then
+lets you interpolate a station for whatever the tape did not reach — there, the
+reducing coupling at 20.8" — at roughly ±15% instead of a guess. Report which
+stations came off the tape and which off that interpolation; they are different
+kinds of number and the user will want to re-measure only the second kind.
+
 ### 12.4 What a photograph *can* tell you reliably
 
 Some things read better off a photo than off a drawing — use them:
@@ -1391,6 +1498,12 @@ set is narrower but sharper than for prose:
 - **End configuration** where the line disappears from view — one bend or two,
   buried continuation or terminated.
 - **Branch direction**, if the foreshortening cue is not decisive.
+- **Which way a branch leaves the ground plane**, for an assembly photographed
+  lying flat. `+Z` (up, off the slab) and `−Z` (down through it, with the
+  assembly propped on that leg) look nearly identical from above, and the
+  giveaways — a shadow gap, what the thing is resting on — are exactly what a
+  close-up crops out. Name both readings and ask. In the worked example this was
+  the one thing the user had to correct after the build.
 
 **Ask when two of the user's own statements cannot both be true**, and say which
 two. The common shape is one callout placing a tee "just upstream of" a flange
@@ -1426,3 +1539,27 @@ absorb it:
   is tabulated at the line's class across everything it needs — pipe, flange,
   gasket, bolts, outlet, valve — then say in the report that it was absent from
   the spec and what you matched it to.
+
+### 12.8 Modelling a different fitting class than the one in the photo
+
+"These are 150# threaded fittings; model them as 3000# socket-weld" is a normal
+request — the photo is of what exists, the model is of what will be built. The
+substitution changes every take-out, so the thing to hold fixed is the **work
+points**, not the pipe lengths. Do what §9.2 already says and it costs nothing:
+
+1. Put every fitting's work point at its photographed station.
+2. Derive every pipe by spanning the placed fittings' world ports (§3.3).
+
+The take-out difference then lands where it belongs — in the pipe lengths — and
+you can say so with numbers rather than assurances. In the worked example all
+five tape stations and all five branch legs reconciled at `delta = ±0.000000 in`
+while the pipes came out at lengths nobody typed in. **Name in the report which
+fitting class the geometry is and which one the photograph is**, because the two
+are now different and only the report records that.
+
+One corollary is worth stating, because it is the cheapest evidence that the
+chain really is solved: since the geometry comes from the stations, a correction
+to a fitting's *orientation* must change no pipe length at all. When that job's
+3/4" tee branch was re-aimed from `−Y` to `−Z`, the rebuild produced ten
+identical cut lengths. A correction that moves a dimension you did not touch
+means the chain is not solved but tuned (§9.7).

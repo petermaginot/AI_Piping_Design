@@ -2,19 +2,23 @@
 
 Guidelines for using AI large language models for piping design in CAD programs.
 
-Instructions and worked examples for an **AI agent that builds piping designs** —
-spools, runs, trap stations, tie-ins — in CAD, from a natural-language prompt, a
-hand-drawn isometric, a commercial drawing, or a photograph of the real thing.
+This repo contains instructions and worked examples for an AI agent that builds piping designs in CAD software. The AI agent can be directed from a written prompt, a hand-drawn isometric sketch, a pre-existing drawing, or a photograph of the real thing. Examples here
+use FreeCAD, a free open-source CAD program, with the Quetzal piping design workbench, but
+the techniquies could also be applied to AutoCAD or any other commercial piping design software
+that allows the use of macros or the model context protocol to allow the AI to direct the software.
 
-The hard part is not the geometry. It is the judgement around it: reading
-dimensions to work points rather than to cut lengths, solving a stated
-relationship through the port chain instead of tuning a constant until it looks
-right, knowing when a hundred millimetres of disagreement means the joint should
-have no pipe in it at all, and verifying every constraint numerically before
-claiming the model is done. That knowledge lives in
+Large language models are surprisingly capable of interpreting drawings and pictures to figure out the geometry
+of the piping arrangement you're trying to model but they need some guidelines so to interpret things correctly.
+For example, they need to be told to read dimensions to work points rather than to cut lengths, need to know when
+fittings are chained back-to-back rather than having tiny pipe pup slivers that don't meet minimum weld spacing
+when they misinterpret the dimensions by an inch or so, and need to be told to re-check after building to make sure the modeled dimensions match the given dimensions. These guidelines are located at 
 [`docs/freecad-quetzal-guide.md`](docs/freecad-quetzal-guide.md).
 
-**Scope today:** FreeCAD, driven over MCP, building with the Quetzal workbench.
+Note that for complex arrangements, the AI model rarely gets everything correct on the first try. A bit of back and forth
+to nudge it in the correct direction is to be expected. The more detail you can include on your prompting documents, the better.
+When prompting with photographs, multiple angles are helpful. Annotating the photos is also helpful.
+
+Right now, this repo supports FreeCAD, driven over MCP, building with the Quetzal workbench.
 The methodology is not FreeCAD-specific and the intent is to generalize it to
 other piping CAD packages, but nothing here is abstracted for that yet.
 
@@ -34,7 +38,7 @@ for you.
 
 ## Pointing this repo at your Quetzal installation
 
-Nothing in this repo vendors Quetzal's dimension tables; they are read live from
+Nothing in this repo supplies Quetzal's dimension tables; they are read live from
 wherever Quetzal is installed. [`quetzal_env.py`](quetzal_env.py) finds it, in
 this order:
 
@@ -56,16 +60,16 @@ echo "C:/Users/you/Documents/repo/quetzal" > .quetzal_path
 
 ## Quickstart
 
-In FreeCAD, **Macro → Execute** (or paste into the Python console):
+With FreeCAD running, run Claude in your IDE (I use VSCode) with this repo opened. You can then either narrate what you
+want it to model, or supply a drawing or photographs to model. 
 
-```
-examples/spool_8in_600_elbow/make_spool_8in_600_elbow.py
-```
+To recreate the photo example, prompt:
 
-It builds an 8" 600# spool — WN flange, 36" of Sch-STD pipe, a 90 LR elbow, 24"
-more pipe, an SO flange — saves the result beside itself, and prints the §8
-sanity checks to the report view. If it raises `QuetzalNotFound`, see the
-section above.
+**Create a FreeCAD model of the piping arrangement shown in the photos in @examples/photo_example  . Reference @docs/freecad-quetzal-guide.md . All pipes are 3/4" and 1/2" nominal diameter Schedule 40. All tees and elbows in the photos are 150# socket fittings. Model all fittings as 3000# socket fittings. Note that the photograph's fittings won't exactly match the dimension of the Quetzal model. This may require adjusting the length of individual pipes so that the fitting work points match the dimensions given in the photograph with the tape measure. Tape measure lengths are given in inches.**
+
+After a few minutes, the model responded with a few questions (whether to guess non-specified dimensions or request them, what output was desired, where the measuring tape was referenced from). It mis-judged the roll angle of one of the tees, but the following additional prompt corrected it:
+
+**A correction - the 3/4" socket straight tee [F5] should have its branch pointed in the -Z direction, with the socket ell [F6] having one port oriented with the [F5] fitting and the other pointing in the -Y direction.**
 
 ## What is here
 
@@ -80,16 +84,18 @@ building from a field photograph (§12).
 ### `examples/`
 
 Each folder holds one macro, its source material where there is one, and the
-`.FCStd` it produces.
+`.FCStd` it produces. `photo_example/` is the exception: it is source material
+only, because that session asked for the live model and nothing on disk.
 
 | | |
 |---|---|
-| `spool_8in_600_elbow/` | The canonical worked example. Start here. |
+| `spool_8in_600_elbow/` | A worked example. Start here. |
 | `spool_4in_300_inline/` | In-line spool with a 1" 3000# sockolet clocked at 90°, plus gaskets, bolts and blinds. |
 | `iso_3in_tee_run/` | From a hand-drawn isometric: 3" 600# flange / elbow / equal tee. |
 | `iso_10in_300_branch_run/` | From a hand-drawn isometric: 10" U-run with two 2" weldolet branches, keyed to a BOM. |
 | `sketch_4in_150_tee_spool/` | From a phone photo of a pencil sketch: 4" 150# tee spool. |
 | `sketch_3in_300_tee_drop_spool/` | From a phone photo of a pencil sketch: 3" 300# tee-drop spool. |
+| `photo_example/` | From annotated field photos of the real thing: 1/2" and 3/4" Sch-40 run with two socket tees, three socket ells, a union and a reducing coupling, stationed off a tape measure. Source material only — the Quickstart prompt rebuilds it live. |
 | `launcher_drain_addition/` | The odd one out — it *modifies* an existing model, deleting a blind flange and building a 2" Sch-80 drain run in its place. |
 
 ### `reference/`
