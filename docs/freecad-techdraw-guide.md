@@ -98,7 +98,8 @@ def find_doc(name):
 
 Several TechDraw helpers act on `FreeCAD.ActiveDocument`, not on the object you
 hand them. If the user has two models open, you will silently build into the
-wrong one. `FreeCAD.setActiveDocument(doc.Name)` first, every time.
+wrong one. `FreeCAD.setActiveDocument(doc.Name)` first, every time — on the
+document you are building in, and never on the user's own file (§2.3).
 
 ### 2.3 The user's own files are reference, not a work surface
 
@@ -106,6 +107,24 @@ A model the user opened from their own drive is not yours to rebuild, recompute
 or save. Read it to learn the conventions; build on a document in the repo.
 Recomputing someone's page marks their file modified, and a TechDraw teardown
 can crash FreeCAD outright — which it did, once, while this guide was written.
+
+**The MCP bridge will save it for you unless told not to.** Before running your
+code, every `execute_python` call saves the **active** document, if it has a
+file path. The AICopilot preference `AutoSaveBeforeRiskyOp` controls this, and
+it defaults to on. So a user's model that you activated just to read from is
+written back to their drive on your very next call, including any recompute
+you caused. Check the preference before anything else:
+
+```python
+FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/AICopilot") \
+       .GetBool("AutoSaveBeforeRiskyOp", True)
+```
+
+If it is on and one of the user's saved files is open, **stop and tell them**.
+Offer to switch it off (`.SetBool("AutoSaveBeforeRiskyOp", False)`), and do it
+only if they agree. Either way, read their document through `find_doc` (§2.1)
+without activating it. The repo document you are drawing on is saved too, on
+every call, so expect it to show in `git status` as you go.
 
 ---
 
@@ -828,6 +847,8 @@ The repair is the same as the initial projection (§5.2) — `KeepUpdated = True
 touch every view, recompute, wait, then set it back. It took 4.1 s on an
 eleven-component spool. It changes no geometry, but it does mark the document
 modified, so on somebody else's file say so and let them decide whether to save.
+They only get that choice if the bridge's autosave is off (§2.3). Check it
+before you touch the file, not after.
 
 ---
 
@@ -951,7 +972,8 @@ Per [`AGENTS.md`](../AGENTS.md):
 
 ## 16. The loop, end to end
 
-1. Confirm the session; set the active document (§2).
+1. Confirm the session; check the bridge's autosave preference; set the active
+   document (§2).
 2. Tear down the previous drawing — annotations, then views, then template, then
    page, then the spreadsheet, then the container. Empty the container before
    removing it, or it takes the geometry with it.

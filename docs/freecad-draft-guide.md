@@ -74,8 +74,20 @@ looks right in the GUI, and still ships a broken deliverable.
 import FreeCAD, FreeCADGui, Draft
 print(FreeCAD.Version()[:3], "GUI:", FreeCAD.GuiUp)
 print("workbench:", FreeCADGui.activeWorkbench().name())
-print("open documents:", list(FreeCAD.listDocuments().keys()))
+print("open documents:", {n: d.FileName for n, d in FreeCAD.listDocuments().items()})
+print("bridge autosave:", FreeCAD.ParamGet(
+    "User parameter:BaseApp/Preferences/Mod/AICopilot"
+).GetBool("AutoSaveBeforeRiskyOp", True))
 ```
+
+**The MCP bridge saves the active document before every `execute_python`
+call**, if the document has a file path. The AICopilot preference
+`AutoSaveBeforeRiskyOp` controls this, and it defaults to on. Your own freshly
+created build document has no path, so it is safe until `save()` (§11). A user's
+file that happens to be active is not. If autosave is on and any of the user's
+saved files is open, **stop and tell them**. Offer to switch it off
+(`.SetBool("AutoSaveBeforeRiskyOp", False)`), do it only if they agree, and
+never activate their document yourself.
 
 `FreeCAD.listDocuments()` returns a `dict` keyed by document name. Iterating it
 yields **strings**, not documents — `[d.Name for d in FreeCAD.listDocuments()]`
@@ -918,6 +930,11 @@ It costs nothing — Qt is already loaded — it makes the deliverable PNG and t
 deliverable SVG the same artwork by construction, and it means every save
 exercises the export path that §10 says is the one that breaks.
 
+After `saveAs` the document has a path, so with the bridge's autosave on (§2)
+every later `execute_python` call rewrites the `.FCStd` while that document is
+active. Close or recreate it (the §3 loop already does) before running more
+checks, or expect the extra git diff.
+
 Report the paths you wrote, and say plainly whether anything was staged or
 committed.
 
@@ -925,7 +942,8 @@ committed.
 
 ## 12. The loop, end to end
 
-1. `check_freecad_connection`; print version, GUI flag, open documents (§2).
+1. `check_freecad_connection`; print version, GUI flag, open documents and the
+   bridge's autosave preference (§2).
 2. Confirm the font carries the glyphs you need (§2.1).
 3. **Measure the reference before writing any constants** — fit the centre,
    take the angular spans and element counts, and if the spec is a PDF, get

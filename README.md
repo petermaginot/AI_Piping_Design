@@ -11,14 +11,23 @@ Large language models are surprisingly capable of interpreting drawings and pict
 of the piping arrangement you're trying to model but they need some guidelines so to interpret things correctly.
 For example, they need to be told to read dimensions to work points rather than to cut lengths, need to know when
 fittings are chained back-to-back rather than having tiny pipe pup slivers that don't meet minimum weld spacing
-when they misinterpret the dimensions by an inch or so, and need to be told to re-check after building to make sure the modeled dimensions match the given dimensions. These guidelines are located at 
+when they misinterpret the dimensions by an inch or so, and need to be told to re-check after building to make sure the modeled dimensions match the given dimensions. The modelling guidelines are located at 
 [`docs/freecad-quetzal-guide.md`](docs/freecad-quetzal-guide.md).
+
+Once the model exists, the agent can also turn it into a fabrication drawing with FreeCAD's TechDraw workbench —
+views, a bill of material, balloons, and dimensions to work points — following
+[`docs/freecad-techdraw-guide.md`](docs/freecad-techdraw-guide.md). For flat 2D artwork such as seals, stamps and
+title block drawings, there is a companion guide for the Draft workbench at
+[`docs/freecad-draft-guide.md`](docs/freecad-draft-guide.md).
 
 Note that for complex arrangements, the AI model rarely gets everything correct on the first try. A bit of back and forth
 to nudge it in the correct direction is to be expected. The more detail you can include on your prompting documents, the better.
-When prompting with photographs, multiple angles are helpful. Annotating the photos is also helpful.
+When prompting with photographs, multiple angles are helpful. Annotating the photos to call out specific components and dimensions is also helpful.
 
-Right now, this repo supports FreeCAD, driven over MCP, building with the Quetzal workbench.
+Right now, this repo supports FreeCAD, driven over MCP and the following workbenches:
+-Quetzal workbench for modelling piping systems
+-TechDraw for generating construction drawings of modeled piping systems
+-Draft for 2D artwork and drawing supplements, like title blocks, engineering stamps, etc.
 The methodology is not FreeCAD-specific and the intent is to generalize it to
 other piping CAD packages, but nothing here is abstracted for that yet.
 
@@ -35,6 +44,10 @@ friends only build geometry when a GUI ViewObject exists. Headless `freecadcmd`
 fails with `'NoneType' object has no attribute 'Deviation'`. Everything here
 targets a running GUI session — via MCP for the agent, via **Macro → Execute**
 for you.
+
+TechDraw and Draft are included in the standard FreeCAD installation, so they need no separate install. TechDraw
+also needs the GUI: its view providers only exist there, so views never project
+under `freecadcmd`. The TechDraw and Draft guides were checked against FreeCAD 1.1.
 
 ## Pointing this repo at your Quetzal installation
 
@@ -71,15 +84,29 @@ After a few minutes, the model responded with a few questions (whether to guess 
 
 **A correction - the 3/4" socket straight tee [F5] should have its branch pointed in the -Z direction, with the socket ell [F6] having one port oriented with the [F5] fitting and the other pointing in the -Y direction.**
 
+To make a drawing of a finished model, open it in FreeCAD and prompt something like:
+
+**Make a TechDraw drawing of the open spool, with an isometric, front and top view, a BOM and balloons. Reference @docs/freecad-techdraw-guide.md .**
+
 ## What is here
 
 ### `docs/`
 
-[`freecad-quetzal-guide.md`](docs/freecad-quetzal-guide.md) — the guide. Golden
-rules, the `pCmd` maker catalog, flanges, ports and `alignTwoPorts`, the
-`tablez/` tables, the build-and-verify loop over MCP, and three chapters on
-sources: reading an isometric (§9), building from a text prompt (§11), and
-building from a field photograph (§12).
+- [`freecad-quetzal-guide.md`](docs/freecad-quetzal-guide.md) — the modelling
+  guide, and the core of the repo. Golden rules, the `pCmd` maker catalog,
+  flanges, ports and `alignTwoPorts`, the `tablez/` tables, the build-and-verify
+  loop over MCP, and three chapters on sources: reading an isometric (§9),
+  building from a text prompt (§11), and building from a field photograph (§12).
+- [`freecad-techdraw-guide.md`](docs/freecad-techdraw-guide.md) — turning a
+  finished spool into a drawing. The welded-only `App::Part` container (which is
+  also the performance control), making views actually project, the view
+  coordinate frame, the BOM spreadsheet and its text-parsing trap, balloons,
+  dimensioning to work points with `AutoCorrectRefs` off, and verifying the page
+  numerically.
+- [`freecad-draft-guide.md`](docs/freecad-draft-guide.md) — flat 2D artwork with
+  the Draft workbench. The build-script / `importlib.reload` loop, `MakeFace`
+  defaults, ShapeString text and text on an arc, baking arrays, measuring a
+  reference image, and fixing and verifying SVG export.
 
 ### `examples/`
 
@@ -97,6 +124,7 @@ only, because that session asked for the live model and nothing on disk.
 | `sketch_3in_300_tee_drop_spool/` | From a phone photo of a pencil sketch: 3" 300# tee-drop spool. |
 | `photo_example/` | From annotated field photos of the real thing: 1/2" and 3/4" Sch-40 run with two socket tees, three socket ells, a union and a reducing coupling, stationed off a tape measure. Source material only — the Quickstart prompt rebuilds it live. |
 | `launcher_drain_addition/` | The odd one out — it *modifies* an existing model, deleting a blind flange and building a 2" Sch-80 drain run in its place. |
+| `TechDraw_example/` | A TechDraw drawing of a DN150 spool (`Simple_spool.FCStd`): isometric, front and top views, a BOM, balloons and work-point dimensions. The worked example for the TechDraw guide. |
 
 ### `reference/`
 
@@ -117,6 +145,9 @@ macro goes through it rather than carrying its own copy of the lookup.
 - **Nominal sizes are DN labels**, even for imperial NPS — 8" is `DN200`. The
   `PSize` column in the tables is the key.
 - **Dimensions come from `tablez/`, never from a number typed into the macro.**
+- **Drawings print in the user's unit schema.** A TechDraw dimension or BOM
+  quantity reads in inches or millimetres depending on FreeCAD's preferences;
+  nominal sizes are shown as names (`6"` or `DN150`), never converted.
 - **Macros write only beside themselves.** Nothing in this repo writes into your
   Quetzal installation.
 

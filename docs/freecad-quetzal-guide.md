@@ -32,8 +32,9 @@ wrong geometry or crashes.
    session, so this requirement is satisfied for free and needs no workaround.
    Build with `execute_python`, verify in the same session (§10), and show the
    user the finished model rather than instructions for producing it.
-   **Confirm the session before you build** — `check_freecad_connection`, and
-   check that the Quetzal workbench is loaded (§2).
+   **Confirm the session before you build** — `check_freecad_connection`,
+   check that the Quetzal workbench is loaded, and check whether the bridge
+   will autosave the user's files (§2, §2.1).
 2. **Units are millimetres.** Convert imperial input: `inches * 25.4`.
    E.g. a 24" length → `609.6`.
 3. **Nominal sizes are DN (metric bore) labels**, even for imperial NPS.
@@ -118,7 +119,10 @@ Verify the session before building:
 print(FreeCAD.Version()[:3], "GUI:", FreeCAD.GuiUp)
 print("workbench:", FreeCADGui.activeWorkbench().name())   # want QuetzalWorkbench
 print("QDIR:", QDIR)
-print("docs:", list(FreeCAD.listDocuments()))
+print("docs:", {n: d.FileName for n, d in FreeCAD.listDocuments().items()})
+print("bridge autosave:", FreeCAD.ParamGet(
+    "User parameter:BaseApp/Preferences/Mod/AICopilot"
+).GetBool("AutoSaveBeforeRiskyOp", True))                  # see §2.1
 ```
 
 ### 2.1 Choose the target document deliberately
@@ -133,6 +137,24 @@ whole thing collapses to a **single undo** for the user. This is the courtesy
 that makes building in someone's live session acceptable rather than intrusive.
 Do not `saveAs` unless the user asked for a file, and never write an `.FCStd`
 into the installed `Mod/Quetzal/` directory.
+
+**The MCP bridge saves for you unless it is told not to.** Before running your
+code, every `execute_python` call (and every `part_operations` boolean) saves the
+**active** document, if it has a file path. It writes the state left by the
+*previous* call, to the path it was opened from. A new, unsaved document is
+never touched. The AICopilot preference `AutoSaveBeforeRiskyOp` controls this,
+and it defaults to on. So:
+
+- Read it in the preamble (§2). If it is on and any open document has a
+  `FileName`, **stop and tell the user** before building. Offer to switch it off
+  (`FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/AICopilot")
+  .SetBool("AutoSaveBeforeRiskyOp", False)`), and do it only if they agree.
+  Mention the setting again at handover.
+- Never make a user's saved file the active document just to read from it.
+  `FreeCAD.getDocument(name)` gives you the object without activating it.
+- Once you `saveAs` a document into the repo, every later call rewrites it while
+  it stays active. Run post-save checks against a scratch document, or accept
+  the resulting git diff.
 
 ### 2.2 The session namespace persists — and that cuts both ways
 
@@ -165,7 +187,11 @@ which would build from a table the workbench itself cannot see.
 
 The same split applies to code: editing `pCmd.py` in the repo does not affect the
 running session. If the user changes workbench source, they must sync it across
-and then reload (`reload_modules`, or restart FreeCAD) before it takes effect.
+and then reload it (`importlib.reload(pCmd)`, plus any module it imports that
+also changed, or restart FreeCAD) before it takes effect. The MCP
+`reload_modules` tool is **not** this. It reloads only the MCP addon's own
+handlers, and in doing so it empties the `execute_python` namespace, so re-send
+the §2 preamble after it.
 
 ---
 
@@ -1100,13 +1126,14 @@ vert = flg + L1 + val(el.BendRadius)   # elbow take-out for a 90 is BR
 print("expect %.2f, built %.3f, delta %.4f" % (vert, dz, abs(dz - vert)))
 ```
 
-Three MCP tools do the rest without any code of yours:
+Four MCP tools do the rest without any code of yours:
 
 | Tool | Use |
 |---|---|
 | `geometric_verification` `verify_no_self_intersection` | Per-object OCCT validity |
 | `spatial_query` `batch_interference` | All pairs at once |
 | `spatial_query` `clearance` / `alignment_check` | A stated gap or alignment (§9.7) |
+| `measurement_operations` `find_root_cause` | A check failed on something built from several inputs (an `App::Part`, a compound): names the part that introduced the defect, not the container that inherited it |
 
 **Read `batch_interference` correctly.** Welded neighbours *touch*, so a
 correctly built spool reports one "collision" per joint, each with **zero overlap
@@ -1135,7 +1162,8 @@ temp file it deletes. `saveImage` has no size ceiling, honours the path, takes
 well under a second, and lets you set the background.
 
 Finally, respect the session you borrowed: the build is one undo (§2.1), nothing
-is saved unless asked, and no `.FCStd` is written into `Mod/Quetzal/`.
+is saved unless asked (which, with the bridge's autosave on, means no saved
+document was ever active: §2.1), and no `.FCStd` is written into `Mod/Quetzal/`.
 
 ---
 
@@ -1284,7 +1312,8 @@ needs to check the build against what they asked for:
 - **The §10.2 verification numbers** — port closures and the take-out
   reconciliation — quoted, not summarised as "verified".
 - The document you built into, and the save path, or a note that nothing was
-  written to disk.
+  written to disk. Include the state of the bridge's `AutoSaveBeforeRiskyOp`
+  preference (§2.1), and any file it saved.
 
 ---
 
