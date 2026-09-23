@@ -14,6 +14,8 @@ fittings are chained back-to-back rather than having tiny pipe pup slivers that 
 when they misinterpret the dimensions by an inch or so, and need to be told to re-check after building to make sure the modeled dimensions match the given dimensions. The modelling guidelines are located at 
 [`docs/freecad-quetzal-guide.md`](docs/freecad-quetzal-guide.md).
 
+It is also helpful if you give it specifications for the system you are trying to model. See the [Spool prompt template](reference/spool_prompt_template.md), where you can specify pipe schedules, flange classes, etc. for a given model. Also you can include general guidelines for the type of system you are modeling, for instance the [the Pig Trap Guidelines](/reference/pig_trap_guidelines.md) describing the general components required for a pig launcher or receiver. You can add specifications or guidelines for any sort of system you're looking to model.
+
 Once the model exists, the agent can also turn it into a fabrication drawing with FreeCAD's TechDraw workbench —
 views, a bill of material, balloons, and dimensions to work points — following
 [`docs/freecad-techdraw-guide.md`](docs/freecad-techdraw-guide.md). For flat 2D artwork such as seals, stamps and

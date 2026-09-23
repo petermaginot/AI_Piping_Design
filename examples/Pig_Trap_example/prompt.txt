@@ -1,0 +1,15 @@
+Claude Opus 5.5
+
+Design a pig launcher assembly with an NPS 8 minor barrel at least 2 feet long, a NPS 12 major barrel at least 
+8 feet long, a NPS 8 kicker line off to the left, a NPS 3 pull port, NPS 1 high point vents, NPS 2 low point 
+drains. The kicker should go off to the left when viewed behind the closure (which is a 12" blind flange). 
+All flanges should be 600#. Fittings 1" and smaller are 3000# socket connections. Piping 3" and larger should 
+be Schedule-STD, 2" and smaller should be Schedule-XS.
+Reference @reference/pig_trap_guidelines.md , @reference/Trap_diagram.svg , @docs/freecad-quetzal-guide.md
+
+---
+A few rounds of correction followed to make sure minimum weld spacing was met,
+add a TOR for a pig sig, add a low point drain on the kicker line, change the reducer
+to eccentric, rotate valve handles to face outwards from the kicker loop so as
+to be easily accessible, and add an elbow to the low point drains so they weren't
+straight down.

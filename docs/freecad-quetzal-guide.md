@@ -155,6 +155,18 @@ and it defaults to on. So:
 - Once you `saveAs` a document into the repo, every later call rewrites it while
   it stays active. Run post-save checks against a scratch document, or accept
   the resulting git diff.
+- **Create your build document with `view_control` `create_document` *before*
+  the first `execute_python`.** The new, unsaved document becomes the active
+  one, so the autosave that fires on that first call has nothing to write, even
+  when the user has a saved model open. This matters most in a correction round
+  after the user has saved your last build into the repo: that file is still
+  open and probably still active. Rebuild into a fresh document created this
+  way, and the user's file is never rewritten mid-build.
+- **When you save a build, make `saveAs` the last call.** From then on, every
+  call re-saves the file first. Take screenshots and run checks before the
+  save, not after. Save a correction round beside the user's file under a new
+  name, such as `..._rev1.FCStd`, unless they asked you to overwrite it. Their
+  copy may be untracked, with nothing in git to recover it from.
 
 ### 2.2 The session namespace persists — and that cuts both ways
 
@@ -271,6 +283,24 @@ outlet = pCmd.makeOutlet(
   `alignTwoPorts(part, weldPort, outlet, 0)`.
 - Always pass **`carrierOD`** = the run pipe's OD so the fitting base is shaped
   flush to the pipe surface.
+- **A TOR (Thread-O-Ring) fitting is just another outlet.** `Outlet_TOR.csv`
+  (`PSize;OD;thk;A;B;Ang;Conn`, BW, no `E`) goes through `makeOutlet` with
+  `"TOR"` at element [0]. Its `B` is `OD + 0.001`, which is enough taper to
+  avoid the zero-taper crash described below. Only the fitting body is
+  tabulated, not the TOR plug or closure, so say so in the report. A cap on it
+  (`makeSocketCap`, mated port 0 to the outlet's port 0) is the nearest stand-in.
+- **Measure an outlet's station along the pipe axis, not as a distance.**
+  `outletPlacementOnPipe` puts `Placement.Base` on the pipe's *outer surface*.
+  `(outlet.Placement.Base - pipe_port0).Length` therefore includes the radius
+  (24.000" read as 24.384" on a DN200). Project onto the axis instead:
+  `(outlet.Placement.Base - wpos(pipe, 0)).dot(pipe_axis)`. A check that
+  disagrees with the prompt by roughly `sqrt(t² + r²) − t` is this, not a
+  build error.
+- **"Edge" of a weldolet or sockolet means its base, `B/2` from its
+  centreline.** "4 in between the flange weld and the edge of the weldolet"
+  puts the centreline at `t = 4·25.4 + B/2` from the pipe end at that weld.
+  Keep that gap as a named constant, and print the toe-to-weld distance in the
+  report.
 - **`B == OD` in the table is a hard crash, not a warning.** `Outlet.execute`
   builds a butt-weld body as `Part.makeCone(r_B, r_od, A, …)`, and OCC raises
   `Part.OCCDomainError: creation of cone failed` for a zero-taper cone. A
@@ -387,6 +417,45 @@ along `+X` with its gearbox up is
 sets the flow axis and lets the roll fall where it may. This is cosmetic-looking
 but obvious in the model, and it is the kind of thing a user notices immediately.
 
+**The handwheel sits on the valve's local `+X` side, and that is a second
+choice.** Once the gearbox is up, the handwheel can face either way across the
+run. Find out which way it faces now by measuring the valve's vertex extents
+along its world-mapped local X (about 285 mm on one side and 184 mm on the
+other for a DN200 600# trunnion valve). Don't assume. When the user wants the
+handwheels "facing out of the loop", or away from where an operator would
+stand, turn the valve **180° about its gearbox axis through the valve
+centre**:
+
+```python
+c = (wpos(v, 0) + wpos(v, 1)) * 0.5
+v.Placement = Placement(Vector(), Rotation(Zhat, 180), c).multiply(v.Placement)
+```
+
+A flanged ball valve is the same at both ends, so nothing else moves. But its
+**ports swap ends**: port 0 is now where port 1 was. Update any joint list you
+verify against (flip `0 ↔ 1` for that valve), or the next closure check
+reports a false gap of one face-to-face length.
+
+**A clash from the actuator envelope is a report item, not something to fix
+on your own.** `TopH`/`WheelD` in the valve tables are generous, so a gearbox
+on a drain valve tucked under a large barrel can overlap the barrel (8130 mm³
+on a DN50 drain under a DN300 barrel). If the user specified that orientation,
+build it, report the overlap with its volume, and offer a fix, such as the
+smallest spacer pipe that clears it (found by translating a copy of the valve
+shape until `common()` is empty). The user may know the real actuator is
+smaller. If the orientation was *your* default, choose a clear one and say so.
+
+#### 3.2.2 Small-bore socket-weld valves
+
+There is **no socket-weld valve table**. `makeValve` does have a SW/TH path,
+`[DN, VType, OD, ODBody, H, E, Conn, Kv?]`, and `Valve_Ball-Threaded.csv`
+supplies every value except `Conn` (spelled `Vtype`, and `Conn = TH`). Pass
+`Conn = "SW"` to model a socket-weld valve on the threaded body dimensions,
+and name it as a substitution in the report and the object label. Its ports
+are at `z = ±(H/2 − E)` (±35.8 mm for DN25), dirs ±Z, at the socket bottoms.
+Mate it with `seat_valve` like a flanged valve, so the handle roll is chosen,
+not left to chance.
+
 ### 3.3 Socket-weld fittings (the 3000# SW family)
 
 `makeSocketElbow`, `makeSocketTee`, `makeSocketCoupling`, `makeSocketUnion` and
@@ -438,6 +507,35 @@ Two things to exploit and one to report:
    row repeats the coupling's dimensions, so the modelled union is
    coupling-length and visibly shorter than a real one. Say so rather than
    letting the user find it.
+
+### 3.4 Eccentric reducers
+
+`makeReduct(..., conc=False)` builds an eccentric reducer. Its local frame is
+not the concentric one, and `alignTwoPorts` will not give you the flat side
+where you want it:
+
+- **Port 0 is the large end at the local origin. Port 1 is the small end at
+  `((OD − OD2)/2, 0, H)`.** Both port directions are along ∓Z.
+- **The flat side is local `+X`**, the line `x = OD/2` along the whole
+  length. The small end is offset toward it.
+- **Flat on bottom (FOB)**, which is what a pig launcher wants: map local
+  `+X → −Z`. For a run along world `+X` with the small end mating a pipe's
+  port 1, local Z must point `−X` (anti-parallel to the pipe's port
+  direction):
+
+  ```python
+  R = Rotation(-Zhat, (-Xhat).cross(-Zhat), -Xhat)          # (x, y = z×x, z)
+  red.Placement = Placement(wpos(pipe, 1) - R.multVec(red.Ports[1]), R)
+  ```
+
+  Flat on top (FOT, for pump suctions) maps local `+X → +Z` instead.
+- **The large-end centreline moves off the small-end centreline by
+  `e = (OD − OD2)/2`**: 52.39 mm for 12"×8", upward for FOB. Every fitting
+  downstream inherits that. A branch that has to meet a line still at the old
+  elevation now has a level change to absorb. Solve it through the chain
+  (§9.3.1) rather than moving the other line. Check the flat side really is
+  flat by comparing the pipe bottoms either side (`z_CL − OD/2`). They should
+  agree to the table's rounding of `OD2` (0.0025 mm here).
 
 ---
 
@@ -954,6 +1052,30 @@ onto an elbow, or an elbow welded onto a weldolet outlet — are still placed by
 > Say in the report that the two constants are locked, so a user editing one
 > knows to edit the other.
 
+#### 9.3.1 Absorbing a small level change by rolling a tee and an elbow
+
+A branch that has to reach a line at a slightly different elevation doesn't
+need an extra pair of elbows. The typical case is a kicker line off a barrel
+that an eccentric reducer lifted (§3.4). Tilt the branch instead:
+
+1. Place the far fitting's work point where the far line needs it. Here that is
+   the elbow at the kicker run's elevation, directly across from the tee.
+2. **Aim the tee's branch straight at that work point:**
+   `u = WP_elbow − WP_tee`, normalised. Place the tee with
+   `Rotation(u.cross(run), u, run)`. Local Y is the branch, local Z the run,
+   and local X = Y × Z keeps it right-handed.
+3. **Place the elbow with `rot_two(d0, d1, −u, outlet_dir)`.** A 90° elbow
+   stays feasible as long as `u ⊥ outlet_dir`, which holds whenever the tilt is
+   in the plane normal to the outlet leg. The feasibility assert (§9.3) checks
+   exactly this.
+4. **Derive the sloped pipe by spanning** the tee's branch port and the elbow's
+   inlet port (§9.2). Its length and angle then follow from the geometry; you
+   don't set them.
+
+Report the tilt in degrees: `asin(−u.z)` gave 1.35° for 52.4 mm over 2.2 m.
+Say that the outgoing leg is still level. If the elevation step changes, the
+whole thing re-solves with no constant to re-tune (§9.7).
+
 ### 9.4 Callout → maker/CSV cheat-sheet
 
 | Callout | Maker | CSV |
@@ -1001,6 +1123,20 @@ and a re-run, not an archaeology exercise.
 - **Label every object with its BOM item and spool number**, e.g.
   `"[5] Elbow DN100 90LR (P3) - spool 6"`. This is how the user finds the part
   they want changed.
+- **With no BOM, give every component a typed mark**: `[P1]` pipe, `[E1]`
+  elbow, `[T1]` tee, `[R1]` reducer, `[F1]` flange (WN and blind), `[V1]` valve,
+  `[G1]` gasket, `[B1]` stud set, `[O1]` outlet (weldolet, sockolet, TOR),
+  `[C1]` cap. Map the prefix from the object's `PType`, not its label.
+  Number the parts in a **walk order you write down explicitly**, one list of
+  keys along the assembly, not in build order. Assert the list covers every
+  object exactly once. Give flange/gasket/stud sets on either side of a valve
+  a side name ("kicker valve, elbow side") rather than "near"/"far". Those words
+  describe build order and read backwards when you walk the run the other way.
+- **Keep marks stable across correction rounds.** The user refers to parts by
+  mark ("add a drain to [P7]"). When parts are removed, leave the gaps. New
+  parts take the next free number, and a deleted number is never reused for a
+  different part. Offer a full renumber, but don't do one without being asked.
+  A renumber silently repoints every mark in the conversation.
 - **Print a report** (`FreeCAD.Console.PrintMessage`) containing: the work-point
   table with elevations; every pipe cut length with its label; the take-outs
   actually read from `tablez/`; every short-pipe adjustment (§9.2.2); derived
@@ -1141,6 +1277,22 @@ volume** ("sub-tolerance contact"). That is the pass signature, not a failure.
 A real interference is a non-trivial common volume, and a pair that is *not*
 adjacent in your chain showing contact is the genuine warning.
 
+A few adjacent pairs show **real volume that is still not a placement error**.
+They come from the tables and the makers, and every joint in the model shows
+the same number:
+
+| Pair | Typical overlap | Cause |
+|---|---|---|
+| `Bolts_Nuts` ↔ each of its two flanges (or valve ends) | identical on both sides, e.g. 48 230 mm³ at DN200 600# | The nuts sit ~3.85 mm into the flange back faces. The bolt holes *are* cut; the stud set is just short. Equal volume on both sides means it is centred correctly |
+| `Bolts_Nuts` ↔ `Gasket` | a few mm³ | Centring ring OD (`CROD`) is ~0.1 mm past the inner edge of the studs |
+| SW pipe ↔ socket fitting | < 1 mm³ | Pipe-table OD 33.401 vs fitting-table socket 33.4 |
+
+Recognise them by that symmetry and repetition. Mention them once in the
+report as table artefacts, and move on. Anything that is **not** one of these
+(a different volume, a non-adjacent pair, one side of a joint only) is a real
+clash and needs finding. `common().BoundBox` of the pair says where. A
+valve's gearbox against a pipe nearby is the usual culprit (§3.2.1).
+
 ### 10.3 Show it, then leave the session clean
 
 `view_control` `fit_all` + `set_view isometric`, then capture. **Use `saveImage`
@@ -1214,6 +1366,15 @@ geometry or the deliverable:
 
 Everything else: pick the obvious reading, build it, and name the choice in the
 report.
+
+**A removal request removes exactly what it names.** "Remove the pipe and cap
+on the vent and leave it open" meant the *downstream* nipple and cap. The
+valve and the nipple feeding it were to stay, leaving the valve's outlet open.
+Taking out every part between the named ones, because "open" seemed to call
+for it, cost a correction round. When the parts named are not contiguous, or
+the result is ambiguous, remove only what was named and ask about the rest.
+"Leave it open" describes the end state of what's left, not a licence to
+remove more.
 
 ### 11.3 Default these silently, and state them in the report
 
@@ -1592,3 +1753,67 @@ to a fitting's *orientation* must change no pipe length at all. When that job's
 3/4" tee branch was re-aimed from `−Y` to `−Z`, the rebuild produced ten
 identical cut lengths. A correction that moves a dimension you did not touch
 means the chain is not solved but tuned (§9.7).
+
+---
+
+## 13. Worked assembly: a pig launcher
+
+`examples/Pig_Trap_example/` holds an NPS 8 × NPS 12, 600# launcher built from
+a text prompt, `reference/pig_trap_guidelines.md`, and the layout in
+`reference/Trap_diagram.svg`. The final model is
+`AutoGeneratedPigLauncher_8x12_rev1.FCStd`. It is a closed loop, not a spool:
+tie-in tee → trap valve → minor barrel → reducer → major barrel → kicker tee
+and closure, then back through the kicker line and the bypass leg to the tie-in
+tee. A loop raises problems a linear chain never does.
+
+**Ask these in the first round; the prompt will not answer them.**
+
+- **Pipe schedule per size.** The guidelines require one, and a class alone
+  doesn't set it (here, Sch-STD for 3" and up, Sch-XS for 2" and under).
+- **How barrel lengths are measured.** Pipe cut length, flange face to face, or
+  pig space. "Major barrel at least 8 ft" is not the same as 8 ft of room for
+  the pig (below).
+- **How much of the diagram to build.** Barrels only, the trap and kicker
+  valves, or the full loop with bypass and junction tee.
+- **Pull port construction:** weldolet + WN + blind, TOR, or reducing tee.
+- **Which barrels get vents and drains.**
+- **Tie-in spacing and bypass spool length**, which set the size of the loop.
+
+**Read "left/right when viewed from behind the closure" as a frame, and
+verify it.** The viewer faces the trap valve, `forward = −barrel`, so
+`left = up × forward`. With the barrel along `+X` and `+Z` up, left is `−Y`.
+Print `branch_dir · left` in the report (it should be `1.000000`). Don't rely
+on the picture.
+
+**Solve the kicker offset from the bypass stack, not a typed number.** The
+kicker run has to reach the junction tee on the bypass leg. Its offset from
+the barrel is therefore the sum of the tie-in tee `M`, two WN flanges, the
+bypass valve face-to-face, the spool, and the junction tee `C`. Build the
+bypass leg first and place the kicker elbow's work point at (kicker tee X,
+junction tee Y). Then span the drop and run pipes (§9.2, §9.7). A later change
+to the spool or the valve moves the kicker line with it.
+
+**Pig space is not major barrel length.** On a launcher the pig sits between
+the reducer and the kicker tee, ahead of the kick. The pig space is the major
+pipe plus the tee's `C`, measured to the tee centreline. It was 67.6" inside a
+96" face-to-face barrel. Report the two numbers side by side. Welding the
+kicker tee straight to the closure WN (no pup) gives the pig about 12" more
+room in the same barrel.
+
+**Domain defaults the user confirmed in correction rounds** (propose them
+up front next time):
+
+- **Eccentric reducer, flat on bottom (FOB)** (§3.4), then tilt the kicker
+  branch to meet the level kicker run (§9.3.1).
+- **Handwheels on the trap, kicker and bypass valves facing *out* of the
+  loop,** so an operator is never drawn into the middle of the piping
+  (§3.2.1).
+- **Drains elbowed horizontal and pointing away from the loop,** with the
+  gearbox up even when the tabulated actuator envelope clips the barrel. Real
+  drain-valve actuators are smaller than the model's.
+- **High-point vent: sockolet, nipple, SW valve, with the outlet left open**
+  for a threaded or socket plug. Quetzal has no plug component yet, so don't
+  add a nipple and cap in its place (§11.2).
+- **Pull port as close to the trap valve as the weld-spacing rule allows,**
+  with the gap measured weld to the weldolet's edge (§3.1). The user's rule
+  here was 4".
