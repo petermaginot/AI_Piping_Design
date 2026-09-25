@@ -1,7 +1,7 @@
 # make_sketch_3in_300_tee_drop_spool.py
 #
 # Reconstruct the piping spool drawn on the hand isometric IMG_2619.jpg with the
-# Quetzal FreeCAD workbench.  Section numbers below refer to docs/freecad-quetzal-guide.md.
+# Quetzal FreeCAD workbench.  Section numbers below refer to skills/quetzal-piping/.
 #
 # SOURCE
 #   examples/sketch_3in_300_tee_drop_spool/IMG_2619.jpg   3492 x 2297, pen on

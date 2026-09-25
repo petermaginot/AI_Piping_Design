@@ -1,0 +1,12 @@
+{
+  "name": "ai-piping-design",
+  "version": "0.1.0",
+  "description": "Skills for an AI agent that builds piping models in a live FreeCAD session over MCP: Quetzal piping from prompts, isometrics, sketches and photos; TechDraw fabrication drawings; and Draft 2D artwork.",
+  "author": {
+    "name": "Peter Maginot"
+  },
+  "homepage": "https://github.com/petermaginot/AI_Piping_Design",
+  "repository": "https://github.com/petermaginot/AI_Piping_Design",
+  "license": "MIT",
+  "keywords": ["freecad", "quetzal", "piping", "techdraw", "cad", "mcp"]
+}

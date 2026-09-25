@@ -65,7 +65,7 @@ Sch-XS on 2" and Sch-STD on 3", specify the 2"×3" reducer as Sch-XS.
 ### Component chain
 
 Numbered, in order, walking the spool from one end to the other. One component per
-line, in the callout style of [spool_example_BOM.csv](spool_example_BOM.csv):
+line, in the callout style of [spool_example_BOM.csv](../../../examples/iso_10in_300_branch_run/spool_example_BOM.csv):
 
 ```
 Pipe, Sch-STD, 36"
@@ -186,14 +186,14 @@ Document: Spool_8in_SchSTD_600
 Save:     yes -> beside the macro
 ```
 
-Result: [make_spool_8in_600_elbow.py](make_spool_8in_600_elbow.py). That macro
+Result: [make_spool_8in_600_elbow.py](../../../examples/spool_8in_600_elbow/make_spool_8in_600_elbow.py). That macro
 predates this template, so it takes the default roll rather than forcing the turn —
 which happens to land leg 2 along −X. A prompt that states the turn gets it placed
 explicitly instead (the guide §11.5).
 
 ### A second example — branches and capped ends
 
-The spec behind [make_4in_300_inline_spool.py](make_4in_300_inline_spool.py),
+The spec behind [make_4in_300_inline_spool.py](../../../examples/spool_4in_300_inline/make_4in_300_inline_spool.py),
 showing a branch and non-bare terminations:
 
 ```markdown

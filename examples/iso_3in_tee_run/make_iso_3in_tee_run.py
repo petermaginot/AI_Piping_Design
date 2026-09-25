@@ -20,7 +20,7 @@
 #
 # RUN IN THE FreeCAD GUI (Macro -> Execute, or paste in the Python console).
 # Quetzal's execute() methods need a GUI ViewObject, so this cannot run under
-# freecadcmd.  See the guide (docs/freecad-quetzal-guide.md).
+# freecadcmd.  See the guide (skills/quetzal-piping/).
 
 import os
 import sys

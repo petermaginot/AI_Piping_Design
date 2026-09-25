@@ -1,0 +1,16 @@
+{
+  "name": "ai-piping-design",
+  "owner": {
+    "name": "Peter Maginot"
+  },
+  "metadata": {
+    "description": "AI-agent skills for piping design in FreeCAD (Quetzal, TechDraw, Draft) over MCP."
+  },
+  "plugins": [
+    {
+      "name": "ai-piping-design",
+      "source": "./",
+      "description": "Build piping in FreeCAD with Quetzal over MCP, draw it with TechDraw, and make 2D artwork with Draft."
+    }
+  ]
+}

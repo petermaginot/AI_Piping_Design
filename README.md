@@ -11,16 +11,16 @@ Large language models are surprisingly capable of interpreting drawings and pict
 of the piping arrangement you're trying to model but they need some guidelines so to interpret things correctly.
 For example, they need to be told to read dimensions to work points rather than to cut lengths, need to know when
 fittings are chained back-to-back rather than having tiny pipe pup slivers that don't meet minimum weld spacing
-when they misinterpret the dimensions by an inch or so, and need to be told to re-check after building to make sure the modeled dimensions match the given dimensions. The modelling guidelines are located at 
-[`docs/freecad-quetzal-guide.md`](docs/freecad-quetzal-guide.md).
+when they misinterpret the dimensions by an inch or so, and need to be told to re-check after building to make sure the modeled dimensions match the given dimensions. The modelling guidelines are packaged as an agent skill at
+[`skills/quetzal-piping/`](skills/quetzal-piping/SKILL.md).
 
-It is also helpful if you give it specifications for the system you are trying to model. See the [Spool prompt template](reference/spool_prompt_template.md), where you can specify pipe schedules, flange classes, etc. for a given model. Also you can include general guidelines for the type of system you are modeling, for instance the [the Pig Trap Guidelines](/reference/pig_trap_guidelines.md) describing the general components required for a pig launcher or receiver. You can add specifications or guidelines for any sort of system you're looking to model.
+It is also helpful if you give it specifications for the system you are trying to model. See the [Spool prompt template](skills/quetzal-piping/references/spool_prompt_template.md), where you can specify pipe schedules, flange classes, etc. for a given model. Also you can include general guidelines for the type of system you are modeling, for instance the [the Pig Trap Guidelines](skills/quetzal-piping/references/pig_trap_guidelines.md) describing the general components required for a pig launcher or receiver. You can add specifications or guidelines for any sort of system you're looking to model.
 
 Once the model exists, the agent can also turn it into a fabrication drawing with FreeCAD's TechDraw workbench —
-views, a bill of material, balloons, and dimensions to work points — following
-[`docs/freecad-techdraw-guide.md`](docs/freecad-techdraw-guide.md). For flat 2D artwork such as seals, stamps and
-title block drawings, there is a companion guide for the Draft workbench at
-[`docs/freecad-draft-guide.md`](docs/freecad-draft-guide.md).
+views, a bill of material, balloons, and dimensions to work points — following the
+[`techdraw-drawing`](skills/techdraw-drawing/SKILL.md) skill. For flat 2D artwork such as seals, stamps and
+title block drawings, there is a companion skill for the Draft workbench,
+[`draft-2d`](skills/draft-2d/SKILL.md).
 
 Note that for complex arrangements, the AI model rarely gets everything correct on the first try. A bit of back and forth
 to nudge it in the correct direction is to be expected. The more detail you can include on your prompting documents, the better.
@@ -73,6 +73,21 @@ echo "C:/Users/you/Documents/repo/quetzal" > .quetzal_path
 
 `.quetzal_path` is gitignored — it is yours, not the repo's.
 
+## Installing the skills
+
+The guidance is packaged as three [agent skills](skills/), and this repo is also a
+Claude Code plugin marketplace. To use the skills from any project, run this in Claude Code:
+
+```
+/plugin marketplace add petermaginot/AI_Piping_Design
+/plugin install ai-piping-design@ai-piping-design
+```
+
+Once they are installed, the right skill loads by itself when you ask for piping, a drawing or 2D
+artwork, so you do not need to @-mention a guide. Without the plugin, open this repo
+and the agent finds the skills through [`AGENTS.md`](AGENTS.md). You can also
+mention one directly, e.g. `@skills/quetzal-piping/SKILL.md`.
+
 ## Quickstart
 
 With FreeCAD running, run Claude in your IDE (I use VSCode) with this repo opened. You can then either narrate what you
@@ -80,7 +95,7 @@ want it to model, or supply a drawing or photographs to model.
 
 To recreate the photo example, prompt:
 
-**Create a FreeCAD model of the piping arrangement shown in the photos in @examples/photo_example  . Reference @docs/freecad-quetzal-guide.md . All pipes are 3/4" and 1/2" nominal diameter Schedule 40. All tees and elbows in the photos are 150# socket fittings. Model all fittings as 3000# socket fittings. Note that the photograph's fittings won't exactly match the dimension of the Quetzal model. This may require adjusting the length of individual pipes so that the fitting work points match the dimensions given in the photograph with the tape measure. Tape measure lengths are given in inches.**
+**Create a FreeCAD model of the piping arrangement shown in the photos in @examples/photo_example  . All pipes are 3/4" and 1/2" nominal diameter Schedule 40. All tees and elbows in the photos are 150# socket fittings. Model all fittings as 3000# socket fittings. Note that the photograph's fittings won't exactly match the dimension of the Quetzal model. This may require adjusting the length of individual pipes so that the fitting work points match the dimensions given in the photograph with the tape measure. Tape measure lengths are given in inches.**
 
 After a few minutes, the model responded with a few questions (whether to guess non-specified dimensions or request them, what output was desired, where the measuring tape was referenced from). It mis-judged the roll angle of one of the tees, but the following additional prompt corrected it:
 
@@ -88,27 +103,42 @@ After a few minutes, the model responded with a few questions (whether to guess 
 
 To make a drawing of a finished model, open it in FreeCAD and prompt something like:
 
-**Make a TechDraw drawing of the open spool, with an isometric, front and top view, a BOM and balloons. Reference @docs/freecad-techdraw-guide.md .**
+**Make a TechDraw drawing of the open spool, with an isometric, front and top view, a BOM and balloons.**
 
 ## What is here
 
-### `docs/`
+### `skills/`
 
-- [`freecad-quetzal-guide.md`](docs/freecad-quetzal-guide.md) — the modelling
-  guide, and the core of the repo. Golden rules, the `pCmd` maker catalog,
+Each skill's `SKILL.md` holds its golden rules and the end-to-end loop. The
+detail lives in `references/`, and a table in `SKILL.md` says which reference
+file to read, and when. Section numbers (§) are shared across a skill's files.
+
+- [`quetzal-piping`](skills/quetzal-piping/SKILL.md): the modelling
+  skill, and the core of the repo. Golden rules, the `pCmd` maker catalog,
   flanges, ports and `alignTwoPorts`, the `tablez/` tables, the build-and-verify
   loop over MCP, and three chapters on sources: reading an isometric (§9),
   building from a text prompt (§11), and building from a field photograph (§12).
-- [`freecad-techdraw-guide.md`](docs/freecad-techdraw-guide.md) — turning a
+  Its `references/` also holds the domain material:
+
+  | | |
+  |---|---|
+  | `spool_prompt_template.md` | Fill-in template for specifying a spool, so the agent has to ask less. |
+  | `pig_trap_guidelines.md` | Domain reference: pressure class, major/minor barrel sizing, kicker and equalization lines, closures, pull ports. |
+  | `Trap_diagram.svg` | The canonical pig trap layout, referenced by the guidelines. |
+
+- [`techdraw-drawing`](skills/techdraw-drawing/SKILL.md): turning a
   finished spool into a drawing. The welded-only `App::Part` container (which is
   also the performance control), making views actually project, the view
   coordinate frame, the BOM spreadsheet and its text-parsing trap, balloons,
   dimensioning to work points with `AutoCorrectRefs` off, and verifying the page
   numerically.
-- [`freecad-draft-guide.md`](docs/freecad-draft-guide.md) — flat 2D artwork with
+- [`draft-2d`](skills/draft-2d/SKILL.md): flat 2D artwork with
   the Draft workbench. The build-script / `importlib.reload` loop, `MakeFace`
   defaults, ShapeString text and text on an arc, baking arrays, measuring a
   reference image, and fixing and verifying SVG export.
+
+`docs/` holds stubs that redirect the old guide links to these skills.
+`.claude-plugin/` is the plugin and marketplace manifest.
 
 ### `examples/`
 
@@ -127,14 +157,6 @@ only, because that session asked for the live model and nothing on disk.
 | `photo_example/` | From annotated field photos of the real thing: 1/2" and 3/4" Sch-40 run with two socket tees, three socket ells, a union and a reducing coupling, stationed off a tape measure. Source material only — the Quickstart prompt rebuilds it live. |
 | `launcher_drain_addition/` | The odd one out — it *modifies* an existing model, deleting a blind flange and building a 2" Sch-80 drain run in its place. |
 | `TechDraw_example/` | A TechDraw drawing of a DN150 spool (`Simple_spool.FCStd`): isometric, front and top views, a BOM, balloons and work-point dimensions. The worked example for the TechDraw guide. |
-
-### `reference/`
-
-| | |
-|---|---|
-| `spool_prompt_template.md` | Fill-in template for specifying a spool, so the agent has to ask less. |
-| `pig_trap_guidelines.md` | Domain reference: pressure class, major/minor barrel sizing, kicker and equalization lines, closures, pull ports. |
-| `Trap_diagram.svg` | The canonical pig trap layout, referenced by the guidelines. |
 
 ### `quetzal_env.py`
 
