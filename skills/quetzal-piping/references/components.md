@@ -482,6 +482,46 @@ never by position. Example WN 600# file `Flange_ASME-WN-RF-600lb.csv` columns:
 an `FClass` column. Read each row by column name and **default any missing column
 to `0`** — that's exactly what `insertFlangeForm` does.
 
+### 4.1 Bolt-hole orientation — measure it, and state it for a skewed spool
+
+`alignTwoPorts` makes two faces meet but leaves the **roll** free (§9.3). That
+roll also decides where a flange's bolt holes sit. So the model does not
+guarantee that a flange's holes line up with those of its mate, whether a
+flange, a valve's integral flange or a `Bolts_Nuts` set. **Measure them.**
+Holes and studs are cylindrical faces of known radius (`f/2`, `dBolt/2`)
+parallel to the flange axis, so their clock angles come straight off the
+solid:
+
+```python
+def hole_angles(obj, axis_pt, axis, ref, rad, tol=0.6):
+    side = axis.cross(ref); out = set()
+    for f in obj.Shape.Faces:
+        s = f.Surface
+        if s.__class__.__name__ == "Cylinder" and abs(s.Radius - rad) < tol \
+                and abs(abs(Vector(s.Axis).dot(axis)) - 1) < 1e-4:
+            r = Vector(s.Center) - axis_pt; r -= axis * r.dot(axis)
+            if r.Length > 1:
+                out.add(round(math.degrees(math.atan2(r.dot(side), r.dot(ref))) % 360, 3))
+    return sorted(out)
+```
+
+On the launcher, every 4" joint measured holes at 22.5° + n·45° from plant
++Y: the header flange, both ends of the kicker valve, both kicker-spool
+flanges, the tee-branch flange and all three stud sets. Every joint lined up,
+and all were **2-holed to the plant axes** (the holes straddle the
+centrelines, which is standard practice). Treat that as a measured result for
+that model, not a guarantee. Compare each flange with its mate, and raise if
+they differ.
+
+**A spool with a leg skewed in plan needs its flange roll on the drawing.**
+The kicker spool ran 17.3° off the plant axes. Its end flanges had to match
+mates that were 2-holed to the plant, so relative to the spool's own
+centreline the pattern sits 17.3° off 2-hole, with the nearest hole 5.2° off
+the centreline. A fitter who 2-holes it to the spool will not bolt up. Give
+the roll as a number in a note, and as an angle dimension on a from-above
+detail (`techdraw-drawing` skill §11.8). Derive it from the measured holes,
+never from a typed constant.
+
 ---
 
 ## 5. Ports and connecting parts

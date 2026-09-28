@@ -54,6 +54,24 @@ if any(not len(v.getVisibleEdges()) for v in views):
     raise RuntimeError("views never projected -- refusing to annotate them")
 ```
 
+**Wait on a time budget, not a pass count.** Ten quick passes were enough for
+the single 6" spool above. They were not enough for a page carrying 4–8"
+flanges and a reducing tee. Those views took several seconds, and the
+ten-pass loop raised "never projected" on views that were about to finish.
+Loop on the clock instead, with a short sleep, and fail only after a
+generous limit:
+
+```python
+t0 = time.time()
+while time.time() - t0 < 90.0:
+    if all(len(v.getVisibleEdges()) for v in views):
+        break
+    FreeCADGui.updateGui(); time.sleep(0.2); doc.recompute()
+```
+
+When a view reports empty, check it again a few seconds later before you
+doubt the build.
+
 Do every piece of work that reads projected geometry immediately after this,
 while the views are fresh.
 
@@ -83,6 +101,13 @@ NICE_SCALES = [1, 1/2, 1/2.5, 1/4, 1/5, 1/6, 1/8, 1/10, 1/12, 1/15, 1/20, ...]
 
 Fit against the *projected* extent in each direction, not the bounding box
 diagonal, or a long flat spool comes out needlessly small.
+
+**Fit the sheet scale to the dimensioned views only.** An isometric
+carries no dimensions (§11.4). Forcing it to the sheet scale either shrinks
+the working views or leaves the iso postage-stamp sized. Give it its own
+nice scale and print it in its caption (`ISOMETRIC 1:25`). Do the same for
+detail views. The title block then states the scale of the views a fitter
+measures from.
 
 ---
 
@@ -135,6 +160,49 @@ rather than carried over, since the frame itself has moved. Deriving them from
 the view frame at build time, as §6 and §10 do, gets that for free: change the
 spin, rebuild, and the balloons redistribute around the new outline by
 themselves.
+
+### 5.6 Views for skewed and planar runs, and detail views
+
+Front, top and side views only show legs that run along the plant axes. A
+leg skewed in plan, like a kicker line running 17.3° off the barrel,
+projects foreshortened in all three. It then has **no** dimensionable view:
+§11.5.2 rightly refuses any span that is not parallel to the page axes.
+Build the view from the leg instead:
+
+```python
+def elev(leg):                   # leg: horizontal unit vector along the run
+    return leg.cross(Zhat), leg  # Direction, XDirection -> leg true length, +Z up
+```
+
+That elevation is normal to the vertical plane containing the leg. The leg
+reads true length along page-right, and every vertical leg in the same plane
+reads true length along page-up. So check whether the spool is **planar**.
+The launcher's kicker line was (riser, one skewed run, drop), and so was its
+1" equalization line. One such elevation then dimensions the whole spool.
+Test it numerically, not by eye: print the angle between successive
+horizontal legs.
+
+**Drop a view that shows nothing.** A plan view of a planar vertical spool
+is a single line. Replace it with a note saying the spool lies in one plane,
+at what angle to what.
+
+**An isometric can look at a planar spool edge-on.** The standard
+`(1,1,1)` iso looked at the equalization line's plane about 22° off
+edge-on, which piled up the balloons. Aim the iso 45° off the plane instead:
+
+```python
+n = leg.cross(Zhat); h = n + leg; h.normalize()
+d = Vector(h.x * 0.8165, h.y * 0.8165, 0.57735)     # 35.26 deg elevation
+x = Zhat.cross(d); x.normalize()                    # page-right
+```
+
+**Detail views** are ordinary `DrawProjGroupItem`s whose `Source` is a short
+list of objects, such as one flange and the elbow welded to it. They can use
+their own larger scale; say which in the caption. The objects can already sit
+inside the page's `App::Part`. When the feature you need is under another part
+(bolt holes under an elbow, seen from above), set **`HardHidden = True`** on
+that detail only. Hidden lines are costly on a big view but cheap on two
+parts (§13).
 
 ---
 
@@ -215,6 +283,33 @@ centre = view_centre(view)
 u, w = view_uv(view, p3, centre)            # Y up, as balloons use
 view.makeCosmeticVertex(FreeCAD.Vector(u, w, 0.0))
 ```
+
+### 6.3 Projected geometry is a third frame — anchor to it when you can
+
+`view.getVisibleEdges()` / `getHiddenEdges()` return the projected geometry
+**scaled by `view.Scale` and Y-down**. On a from-above flange detail at 1:8,
+the flange disc circle came back with radius 17.06 (= 136.5 × 0.125). Its
+bolt-hole centres sat at −5.2° + 45°·k, the mirror image of the true
++5.2° + 45°·k.
+
+`makeCosmeticLine` and `makeCosmeticVertex` points, by contrast, are
+**unscaled and drawn Y-up**. A line stored from the centre to
+(+cos 17.3°, +sin 17.3°) rendered going page-up.
+
+And on a small detail view, the origin was **not** `TechDraw.findCentroid`
+of the view's sources. `view_uv()` put the flange centre at (−12.97, 4.09).
+The projected disc circle put it at (−7.94, 0.00), which is where it drew.
+So on details, locate features from the projected geometry itself:
+
+```python
+disc = max((e.Curve for e in view.getVisibleEdges() + view.getHiddenEdges()
+            if e.Curve.__class__.__name__ == "Circle"), key=lambda c: c.Radius)
+cx, cy = disc.Center.x / view.Scale, -disc.Center.y / view.Scale   # cosmetic frame
+```
+
+Then check by rendering that a cosmetic line from `(cx, cy)` really starts at
+the feature. A symmetric part can hide a sign error: both flange centres here
+had y = 0.
 
 ---
 

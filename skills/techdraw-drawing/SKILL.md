@@ -19,8 +19,18 @@ without an exception, looks plausible on screen, and is still wrong — a
 dimension that reads 0.00, a BOM whose size column has silently become
 millimetres, a balloon pointing at nothing — or is so slow it cannot be used.
 
-Everything here was measured against a live FreeCAD 1.1 session. The worked
-example is [`examples/TechDraw_example/make_techdraw_page.py`](../../examples/TechDraw_example/make_techdraw_page.py).
+Everything here was measured against a live FreeCAD 1.1 session. There are
+two worked examples:
+
+- [`examples/TechDraw_example/make_techdraw_page.py`](../../examples/TechDraw_example/make_techdraw_page.py):
+  one spool, one page. Its helpers are the base for the second example.
+- [`examples/pig_trap_design/make_launcher_drawings.py`](../../examples/pig_trap_design/make_launcher_drawings.py):
+  three construction drawings on one model. It covers:
+  - views aligned to skewed legs
+  - feet-inch-fraction dimensions
+  - a BOM keyed to model marks
+  - a flange-roll angle dimension
+  - a `report()` that runs the §14 checks
 
 ## Read before you build
 
@@ -31,9 +41,9 @@ such as "§11.2" means the file listed for §11 below. **Read every file marked
 | § | Contents | File | Read |
 |---|---|---|---|
 | 1–4, 14–16 | Golden rules, session preamble, the container, page and template, verification, output, the loop | this file | every drawing |
-| 5–8 | Views and projection, the view coordinate frame, transparency, captions | [references/views.md](references/views.md) | every drawing |
-| 9–10 | Bill of material, balloons | [references/bom-and-balloons.md](references/bom-and-balloons.md) | the drawing has a BOM or balloons |
-| 11 | Dimensions to work points; blank pages; recovering after a crash | [references/dimensions.md](references/dimensions.md) | every drawing |
+| 5–8 | Views and projection, views for skewed or planar runs and details, the view coordinate frames, transparency, captions | [references/views.md](references/views.md) | every drawing |
+| 9–10 | Bill of material (sizing, marks, notes), balloons (crowding, captions) | [references/bom-and-balloons.md](references/bom-and-balloons.md) | the drawing has a BOM or balloons |
+| 11 | Dimensions to work points; ft-in fractions; lanes; angle dimensions; blank pages; recovering after a crash | [references/dimensions.md](references/dimensions.md) | every drawing |
 | 12–13 | Keeping the page off; why the page is slow | [references/performance.md](references/performance.md) | every drawing |
 
 ---
@@ -44,8 +54,9 @@ such as "§11.2" means the file listed for §11 below. **Read every file marked
    control.** Welded components go in; gaskets, bolting and valves stay out.
    This one decision is worth 12x on redraw time (§3, §13).
 2. **A view will not project itself.** Create it, `touch()` it, recompute, then
-   *wait* for the GUI event loop. Until then it has no geometry, and anything
-   that references it fails — sometimes by taking FreeCAD down (§5.2).
+   *wait* for the GUI event loop, on a time budget rather than a fixed number
+   of passes. Until then it has no geometry, and anything that references it
+   fails — sometimes by taking FreeCAD down (§5.2).
 3. **`page.addView()` recentres the view.** Set `X`/`Y` *after* adding, never
    before. The same applies to balloons, dimensions and the spreadsheet (§5.3).
 4. **Balloon coordinates are unscaled view coordinates, Y up, origin at
@@ -89,6 +100,12 @@ such as "§11.2" means the file listed for §11 below. **Read every file marked
 16. **Verify numerically before handing over.** Every dimension read back
     against the model, every balloon proved on-sheet, every mark accounted for
     (§14).
+17. **A dimension only computes while its page has `KeepUpdated = True`.**
+    One added to a page that has already been switched off reads NaN. Build
+    every dimension, including any added later, with updates on (§11.8).
+18. **FreeCAD cannot print feet-inch fractions the drafting way.** Its
+    Building-US schema truncates, and it writes `2' 1" + 3/8"`. Format the
+    text yourself and verify the raw value (§11.3.1).
 
 ---
 
@@ -210,8 +227,51 @@ tmpl.EditableTexts = dict(tmpl.EditableTexts,
                           **{"DrawingTitle1": "SIMPLE SPOOL", "Scale": "1:12"})
 ```
 
-The ASME template has both a `Scale` key (the value) and a `scale` key (the
-literal word "Scale" printed as a label). Set `Scale`.
+**Read the keys from the template; don't assume them.** Different template
+versions name them differently. FreeCAD 1.1's `ASME/ANSIB_Landscape.svg` has
+exactly these, with the scale value in lower-case `scale` and **no** `Scale`
+key:
+
+```
+CompanyName CompanyAddress DrawingTitle1 DrawingTitle2 DrawingTitle3
+drawing_number revision_index DrawnBy CheckedBy Approved1 Approved2
+scale Code Weight Sheet
+```
+
+```python
+import re
+keys = re.findall(r'freecad:editable="([^"]+)"', open(tmpl.Template, encoding="utf-8").read())
+```
+
+Blank the fields you have no value for, such as `CompanyName` or `CheckedBy`.
+Otherwise the template's sample text ("Company Name", "1234 Main St") prints
+on the sheet.
+
+**11×17 is ANSI B landscape**: 431.8 × 279.4 mm. On that template, the inner
+drawing border runs x 22–409 and y 22–257 mm. The title block occupies
+x > 264, y < 69. Lay views, BOM and notes out against those numbers, and
+check balloons against the border, not just the paper (§14).
+
+### 4.1 Several drawings in one document
+
+One model often needs several spool drawings (a barrel spool, a kicker line,
+a small-bore line). Put them all in the model's document, one page each. Give
+each page its **own `App::Part` container**, holding only that spool's welded
+parts.
+
+- **A document object can belong to only one `App::Part`.** Assign every
+  welded part to exactly one spool. When the model carries marks (`[F4]`,
+  `[P8]`), list each spool's members by mark rather than by `PType`, and key
+  its BOM on the same marks.
+- **The teardown removes every page, sheet, annotation and container** before
+  the rebuild. Empty each container before removing it (§16).
+- **A macro that rebuilds the model deletes the drawings.** If the model is
+  regenerated from scratch, the drawing macro must run after it. Say so in
+  both macros' headers.
+
+Worked example: `examples/pig_trap_design/make_launcher_drawings.py`. It
+builds three pages on the launcher model and imports this skill's first
+example (`examples/TechDraw_example/make_techdraw_page.py`) for its helpers.
 
 ---
 
@@ -234,9 +294,17 @@ OK  Overall height     DistanceY reads   1068.40 mm  model   1068.40 mm
 OK  Face to branch CL  DistanceY reads    395.30 mm  model    395.30 mm
 ```
 
-- **Every balloon on the sheet.** `view.X + b.X * view.Scale` inside
-  `(0, Template.Width)`, likewise for Y. A balloon at page coordinate 572 on a
-  431.8 mm sheet is off the paper.
+- **Where a dimension prints fixed text** (`Arbitrary = True`, §11.3.1),
+  check two things: `getRawValue()` against the model, as above, and the
+  printed `FormatSpec` against the formatter applied to that value. The
+  printed text no longer follows the measurement, so a stale label is
+  otherwise invisible.
+- **Every balloon on the sheet**, and inside the drawing border, not just
+  the paper. `view.X + b.X * view.Scale` must lie inside the border (x 22–409,
+  y 22–257 mm on ANSI B), likewise for Y. A balloon at page coordinate 572 on
+  a 431.8 mm sheet is off the paper. Also print the **minimum bubble-to-bubble
+  spacing**. Under ~12 mm, two bubbles are touching or one hides another
+  (§10.2).
 - **Every mark accounted for**, and every mark *without* a balloon explained.
   Assembly material legitimately has none; a welded component with none was left
   out of the container, which is a real defect that otherwise looks identical:
@@ -259,6 +327,32 @@ mdi.activeSubWindow().widget().grab().save(png_path)
 Clear the selection first, or you will be looking at highlight colours and
 vertex dots and think something is wrong. Looking at the page is how you catch
 overlapping text, which no numeric check will tell you about.
+
+To look at the **whole sheet** at a known resolution, render the page's scene
+to the full page rectangle. The scene is page mm × 10, with Y down:
+
+```python
+sc = sub.widget().findChild(QtGui.QGraphicsView).scene()
+W, H = val(tmpl.Width), val(tmpl.Height)
+img = QtGui.QImage(int(W * 4), int(H * 4), QtGui.QImage.Format_ARGB32)
+img.fill(QtGui.QColor("white"))
+p = QtGui.QPainter(img)
+sc.render(p, QtCore.QRectF(0, 0, img.width(), img.height()),
+          QtCore.QRectF(0, -H * 10, W * 10, H * 10))
+p.end(); img.save(png)
+```
+
+Budget for **several layout passes**. On the launcher drawings, the numbers
+were right first time. It took five render-and-adjust rounds to clear these
+collisions:
+- BOM rows running off the sheet
+- notes running past the border
+- captions under balloons
+- dimension text overlapping neighbouring dimensions
+- dimensions running into the title block
+
+Each fix was a position or box size, so keep positions in the spool
+definitions, not scattered through the code.
 
 ---
 
@@ -285,7 +379,8 @@ Per [`AGENTS.md`](../../AGENTS.md):
 3. Collect the welded components; build the `App::Part` (§3).
 4. Create the page and template; fit one scale to all views (§4, §5.4).
 5. Add the views, positioning each **after** `addView` (§5.3).
-6. Project them, and block until they really are projected (§5.2).
+6. Project them, and block until they really are projected. Wait on a time
+   budget, not a fixed count (§5.2).
 7. Dimensions first, while the views are fresh. For each dimensioned view in
    turn, plan what that view can actually show and skip what an earlier one
    already measured (§11.5); then cosmetic vertices, one recompute, indices,
@@ -294,7 +389,8 @@ Per [`AGENTS.md`](../../AGENTS.md):
 9. Balloons on the ring (§10).
 10. Transparency and title block (§7, §4).
 11. Open one window on the page and paint it, **then** `KeepUpdated = False`
-    (§11.6, §12).
+    (§11.6, §12). Every dimension, including any angle dimension, must exist
+    before this point (§11.8).
 12. Run the numeric checks in §14 and print the report.
 13. Look at the page. Save.
 

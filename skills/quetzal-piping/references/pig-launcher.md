@@ -65,3 +65,96 @@ up front next time):
 - **Pull port as close to the trap valve as the weld-spacing rule allows,**
   with the gap measured weld to the weldolet's edge (§3.1). The user's rule
   here was 4".
+
+---
+
+### 13.1 Adding a launcher to an existing header
+
+`examples/pig_trap_design/` holds the second case: an NPS 6 × NPS 8, 600#
+launcher added to an **existing** header (`Header_to_make_piggable.FCStd`).
+The user named two tie-in flanges: a 6" WN for the trap valve and a 4" WN
+for the kicker valve. They asked for a minimum weld-inch design (§9.8), with
+a 2" flanged drain, a 1" equalization line and two threaded 1" vents. The
+build is `make_pig_launcher.py`; the drawings are `make_launcher_drawings.py`.
+
+**Read the header before designing anything** (§2.1 has how to do that
+offline):
+
+- **Which way does it flow?** The riser that feeds the kicker branch is
+  upstream. The pig leaves through the trap valve into the other riser.
+  The valve between the two tees is the bypass.
+- **Which way do the tie-in faces point?** They fix the launcher's
+  orientation. The trap flange faced +Y at elevation 0, so the barrel runs
+  +Y at z = 0. The kicker flange faced +Z on a tee branch, so the kicker
+  valve stands vertical and the kicker line has to climb over and come back
+  down.
+- **Which parts can be reused?** Each tie-in carried a blind with a gasket
+  and stud set. Delete only the blind, and bolt the new valve to the
+  existing gasket.
+- **What will the pig pass through?** Here it went straight through the run
+  of an **equal** 6" tee. Flag that the tee needs guide bars. It is outside
+  what you were asked to build, so report it; don't fix it.
+
+**Ask in the first round** (§11.2), beyond the list in §13:
+- the weld-to-olet spacing rule (4" here)
+- whether the equalization line gets a valve (it should)
+- whether a skewed kicker run is acceptable, or the routes must be
+  orthogonal
+- the deliverables
+
+**Design decisions that carry over:**
+
+- **Pig space on a launcher** is from the reducer's large-end weld to the
+  downstream bore edge of the kicker branch, with the whole pig in the
+  major pipe. Solve the major pipe length from it:
+  - with a tee welded straight to the closure WN: `PIG_LEN + ID_branch/2 − C`
+  - with a weldolet: `PIG_LEN + ID_branch/2`, plus toe spacing to the
+    closure weld
+
+  Print the pig space in the report (2438.40 mm = 96.00 in, exact), and also
+  the larger figure that includes the reducer and the pup.
+- **A launcher needs no pig bars** in the kicker branch. The pig starts
+  downstream of the kicker opening and never passes it, so a weldolet is
+  acceptable there. On a receiver it is not.
+- **The high point may be the kicker line, not the barrel.** When the kicker
+  climbs from a valve on the header and comes back down onto the barrel, gas
+  behind the pig collects in the kicker's level run. A barrel-top vent cannot
+  reach it. Put the major-side vent (and equalization tap) on top of that
+  run.
+- **The minor-side equalization tap needs pipe to sit on.** There is none if
+  the reducer welds straight to the trap-side WN. A short minor pup of
+  `2 × (GAP + B/2)` carries one centred sockolet. Say that the pup exists
+  only for the tap. It is the one weld the minimum-weld design could not
+  remove.
+- **Combine each vent with an equalization tap.** Sockolet → nipple → SW
+  tee: a vertical nipple into a threaded vent valve on the run, the
+  equalization line off the branch. That saves two socket welds per tap.
+- **Choose taps that make the small line planar.** Put the major tap at the
+  point of the kicker run nearest in plan to the minor tap, with the tee
+  branch square to the run. Then the whole equalization line lies in one
+  vertical plane: one elevation dimensions it, and it has one fixed chain
+  for stock nipples (§9.8.2).
+- **Kicker route with a vertical kicker valve:** WN, elbow up and over, one
+  horizontal leg skewed in plan straight at the barrel tap, elbow down, drop.
+  That is two elbows, against three for an orthogonal route. The skew makes
+  the end flanges' bolt-hole roll a fabrication detail (§4.1). Solve both
+  elbows with `rot_two` and the feasibility asserts (§9.3), and derive the
+  drop by spanning ports.
+- **Actuators:** trap valve gearbox up, handwheel facing out of the loop.
+  Vertical kicker valve gearbox pointing away from the loop. Drain and vent
+  levers facing away from the loop. Measure the handwheel side (§3.2.1)
+  rather than trusting the roll.
+
+**Correction rounds on this build**, as a sample of what users change once
+they see the model:
+- a tee instead of the weldolet
+- a flange pair on the kicker branch, as a break-out joint
+- a union in the equalization line
+- a barrel vent
+- the drain moved to mid-barrel
+- marks on every object, old and new
+- stock nipple lengths
+
+None of them broke a constraint, because the kicker station, the drop, the
+equalization legs and the nipple-driven work points were all solved
+(§9.7), not typed.

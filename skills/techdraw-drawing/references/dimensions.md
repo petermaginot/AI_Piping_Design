@@ -73,6 +73,57 @@ schema = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Units").GetInt("Us
 FreeCAD.Units.listSchemas()[schema]      # -> 'ImperialDecimal'
 ```
 
+#### 11.3.1 Feet, inches and sixteenths
+
+Imperial piping drawings are dimensioned in feet, inches and power-of-two
+fractions (`13'-2 15/16"`), usually to the nearest 1/16". FreeCAD has a
+native route, but it does not produce that.
+
+**The native route:** set the document's `UnitSystem` to
+`"Building US (ft-in, sqft, cft)"` (schema `ImperialBuilding`). Then set the
+Units preference `FracInch` (Preferences › General › Units › Minimum
+fractional inch) to 16. `%w` dimensions then print feet, inches and a
+reduced fraction. Measured on the launcher drawings, it has three problems:
+
+| Model value | Native prints | Drafting convention (nearest 1/16) |
+|---|---|---|
+| 158.923 in | `13' 2" + 7/8"` | `13'-2 15/16"` (it **truncates**) |
+| 25.413 in | `2' 1" + 3/8"` | `2'-1 7/16"` |
+| 12.866 in | `1' 7/8"` | `1'-0 7/8"` (it drops the zero inch) |
+
+It also joins the fraction with a `+`. And `FracInch` is a **global**
+preference, so changing it touches the user's other work.
+
+**The route that works:** format the text yourself and write it into the
+dimension:
+
+```python
+def ftin(mm, den=16):
+    n = int(round(mm / 25.4 * den)); ft, rem = divmod(n, 12 * den)
+    whole, frac = divmod(rem, den); fs = ""
+    if frac:
+        g = gcd(frac, den); fs = "%d/%d" % (frac // g, den // g)
+    ins = ("%d %s" % (whole, fs) if (whole or ft) else fs) if fs else str(whole)
+    return ("%d'-%s\"" % (ft, ins)) if ft else ("%s\"" % ins)
+
+d.Arbitrary = True                  # print FormatSpec verbatim
+d.FormatSpec = ftin(d.getRawValue())
+```
+
+Two consequences:
+- **The text no longer follows the model.** Say so on the sheet and in the
+  report. If the model changes, re-run the drawing macro.
+- **Verify both sides** (§14): `getRawValue()` against the model, and
+  `FormatSpec == ftin(model value)`.
+
+Use the same formatter for BOM pipe lengths, so the sheet speaks one
+language. Leave angles in decimal degrees (`FormatSpec = "%.1f"`; TechDraw
+adds the degree sign itself, so `"%.1f°"` prints `°°`).
+
+Horizontal ft-in text on a **vertical** dimension is wide. Stacked vertical
+dimensions need roughly 30 mm between lanes, against about 9 mm for
+decimal inches (§11.5.5).
+
 ### 11.4 Where dimensions go
 
 Not on the isometric. TechDraw foreshortens it, so the numbers are wrong — which
@@ -106,6 +157,8 @@ welded there:
 | Flange | its raised **face** — the datum, not the weld |
 | Elbow | the **intersection of its two port axes** — the corner, not the tangent |
 | Outlet | where the branch centreline meets the **run** centreline |
+| Tee, SocketTee, SocketEll | the local origin, i.e. `Placement.Base` (all centrelines pass through it) |
+| SocketUnion, SW valve, reducer | the port itself (a "weld" point); its length is fixed by the part |
 | nothing | the free end is its own work point |
 
 ```python
@@ -142,6 +195,13 @@ if abs(unit.dot(x_axis)) > 0.9:   return "DistanceX", (0.0, below)
 if abs(unit.dot(y_axis)) > 0.9:   return "DistanceY", (left, 0.0)
 return None                        # skew or edge-on: this view cannot show it
 ```
+
+**Tighten that 0.9 to 0.999 whenever a spool has skewed legs.** At 0.9, a
+leg 25° off the page axis still qualifies. `DistanceX` then prints its
+**projection**, 9% short. The §14 check flags it only if you compare against
+the span length rather than against its projection. Also require the span to
+lie in the view plane (`abs(unit.dot(view.Direction)) < 1e-3`). Skewed legs
+get their own view (§5.6).
 
 Then walk the views in a fixed order and skip what an earlier one already
 measured. Together the rules produce three dimensions on this spool, and no
@@ -216,6 +276,27 @@ predict where a feature should appear and check that it does. Comparing a
 dimension's `sceneBoundingRect()` against the page position you computed for
 its intended anchors turns "does it look right" into arithmetic.
 
+### 11.5.5 Lanes, sides, and which pipes get a dimension
+
+Three rules turned a cluttered small-bore elevation into a readable one:
+
+- **Skip any pipe that ends on something not in this spool.** Examples are
+  a nipple into a sockolet that belongs to another sheet, or into a threaded
+  valve that isn't drawn. Its far end resolves to "end", not to a work point.
+  Its cut length is in the BOM, and a dimension to a free end sets out
+  nothing.
+- **Put a vertical dimension on the side where its feature is**, judged by
+  the sign of the mean `u` of its two anchors. The example parked every
+  `DistanceY` on the left, so the extension lines of right-hand features
+  crossed the whole view.
+- **Pack parallel dimensions into lanes.** Give each a lane, first-fit, where
+  its span (plus a small pad) overlaps nothing already in that lane. Place
+  the dimension text at the middle of its own span (`X` = mid-`u` for
+  `DistanceX`), not at the view centre. A chain of adjacent spans then shares
+  one line, and overlapping spans step out a lane. Lane pitch: about 9 mm
+  below the view for horizontal text, and about 30 mm sideways for vertical
+  dimensions carrying ft-in text (§11.3.1).
+
 ### 11.6 A blank page is usually a window, not a build
 
 When the user says nothing is visible, check the *window* before you doubt the
@@ -270,3 +351,45 @@ eleven-component spool. It changes no geometry, but it does mark the document
 modified, so on somebody else's file say so and let them decide whether to save.
 They only get that choice if the bridge's autosave is off (§2.3). Check it
 before you touch the file, not after.
+
+### 11.8 Angle dimensions
+
+The job here was to dimension an elbow's roll: the angle, seen from above,
+between plant Y and the elbow's run off a flange. The pieces of the solution
+are documented in the code. What cost time were three ways the obvious
+approach fails without an error:
+
+1. **A dimension added to a page with `KeepUpdated = False` reads NaN**,
+   whatever its type. It shows `nan°` on the sheet, `getRawValue()` returns
+   `nan`, and `getAnglePoints()` returns zeros, all while its `State` says
+   Up-to-date. Linear dimensions built during the main pass never hit this,
+   because the page is still updating then. Anything added afterwards does.
+   Set `page.KeepUpdated = True`, recompute, add the dimension, recompute,
+   then switch it back off.
+2. **A two-edge `Angle` dimension on two cosmetic lines reads 0 or NaN**,
+   even with the page updating, and even though the GUI draws the arc in
+   the right place.
+3. **An `Angle3Pt` dimension on three cosmetic vertices works**: end point,
+   apex, end point, in that order, `MeasureType = "Projected"`, with
+   `AutoCorrectRefs` off (§11.2). It read 17.300° against 17.300° from the
+   model.
+
+So draw the two cosmetic lines for the reader, and dimension three cosmetic
+vertices on them:
+
+```python
+view.makeCosmeticLine(c - L*yaxis, c + L*yaxis)       # reference line
+view.makeCosmeticLine(c, c + L*elbow)                 # elbow centreline
+for p in (c + r*elbow, c, c + r*yaxis):               # end, apex, end
+    view.makeCosmeticVertex(p)
+...                                                    # recompute, take last 3 indices
+d.Type = "Angle3Pt"; d.MeasureType = "Projected"
+d.References2D = [(view, ("Vertex%d" % i, "Vertex%d" % j, "Vertex%d" % k))]
+d.FormatSpec = "%.1f"
+```
+
+Locate `c` from the projected geometry, not from `view_uv()`, and mind the
+frames (§6.3). Place the text on the bisector, **outside** the part's
+outline. Label the two lines with small `DrawViewAnnotation`s at their ends
+("PLANT +Y", "ELBOW [E3]"). The expected value comes straight from the model
+(`elbow_dir.getAngle(Y)`), so check it like any other dimension (§14).

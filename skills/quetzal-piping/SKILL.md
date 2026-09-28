@@ -27,16 +27,28 @@ through the chain) apply to every source, not only to isometrics.
 | § | Contents | File | Read |
 |---|---|---|---|
 | 1, 2, 7, 8, 10 | Golden rules, session preamble, workflow, sanity checks, build-and-verify loop | this file | every build |
-| 3–6 | `pCmd` maker catalog, branch outlets, valves, socket-weld, reducers, pipe supports (beam, post, U-bolt, or plain Part solids), flanges, ports and `alignTwoPorts`, `tablez/` | [references/components.md](references/components.md) | every build |
-| 9 | Reading an isometric; dimensions to work points; orientation and roll; structuring the build; constraints through the chain | [references/layout.md](references/layout.md) | every build |
+| 3–6 | `pCmd` maker catalog, branch outlets, valves, socket-weld, reducers, pipe supports (beam, post, U-bolt, or plain Part solids), flanges and bolt-hole orientation, ports and `alignTwoPorts`, `tablez/` | [references/components.md](references/components.md) | every build |
+| 9 | Reading an isometric; dimensions to work points; orientation and roll; structuring the build; marks; constraints through the chain; weld-inches and stock nipple lengths | [references/layout.md](references/layout.md) | every build |
 | 11 | Building from a text prompt | [references/text-prompt.md](references/text-prompt.md) | source is prose |
 | 12 | Building from a field photograph | [references/photograph.md](references/photograph.md) | source is a photo |
-| 13 | Worked assembly: a pig launcher | [references/pig-launcher.md](references/pig-launcher.md), with [pig_trap_guidelines.md](references/pig_trap_guidelines.md) and [Trap_diagram.svg](references/Trap_diagram.svg) | pig trap, launcher or receiver |
+| 13 | Worked assembly: a pig launcher; adding one to an existing header | [references/pig-launcher.md](references/pig-launcher.md), with [pig_trap_guidelines.md](references/pig_trap_guidelines.md) and [Trap_diagram.svg](references/Trap_diagram.svg) | pig trap, launcher or receiver |
 | — | Fill-in spec template to offer when a prompt is under-specified | [references/spool_prompt_template.md](references/spool_prompt_template.md) | as needed |
 
 Outside this folder, at the repository root: `quetzal_env.py` (Quetzal path
 resolution and `tablez/` reads for macro files, §7.1) and `examples/`.
 `examples/spool_8in_600_elbow/` is the reference for the shape a macro should take.
+`examples/pig_trap_design/make_pig_launcher.py` is the reference for:
+- adding to an **existing** model (§2.1, §13.1)
+- minimising weld-inches, and stock nipple lengths (§9.8)
+- marking every object, old and new (§9.6)
+
+Its sibling `make_launcher_drawings.py` makes the TechDraw drawings (see the
+`techdraw-drawing` skill).
+
+The fabrication conventions in §4.1, §9.8 and §13.1 (weld spacing, stock
+nipple lengths, bolt-hole straddle, weld-inch counting) are this repo's
+working rules for now. Confirm them with the user when a job has its own
+spec.
 
 ---
 
@@ -169,6 +181,18 @@ and it defaults to on. So:
   Mention the setting again at handover.
 - Never make a user's saved file the active document just to read from it.
   `FreeCAD.getDocument(name)` gives you the object without activating it.
+- **To inspect a saved model without touching the session at all** (for
+  example while planning, before you have decided which document is safe),
+  read the file offline. An `.FCStd` is a zip:
+  - `Document.xml` holds every object's properties, including `Label`,
+    `PSize`, `Placement` (as a quaternion) and the dimensions.
+  - `Ports` and `PortDirections` are sidecar binary files named by the
+    property's `file=` attribute: a little-endian `uint32` count, then that
+    many `float64` x, y, z triples.
+
+  Rotate those by the placement to get every port in world coordinates.
+  That is enough to plan an addition to an existing model before the first
+  `execute_python`.
 - Once you `saveAs` a document into the repo, every later call rewrites it while
   it stays active. Run post-save checks against a scratch document, or accept
   the resulting git diff.
@@ -179,6 +203,19 @@ and it defaults to on. So:
   after the user has saved your last build into the repo: that file is still
   open and probably still active. Rebuild into a fresh document created this
   way, and the user's file is never rewritten mid-build.
+- **To modify an existing model the user has open, copy the file on disk and
+  open the copy.** The user's `Header_to_make_piggable.FCStd` was already
+  open (as `Unnamed`) with no unsaved changes. The safe sequence:
+  1. Create a scratch document with `view_control` first, so the first
+     autosave has nothing to write.
+  2. Check the user's document without activating it: `isTouched()`, its
+     object count, its `UndoNames`.
+  3. `shutil.copyfile(src, dst)` to the new name, then `openDocument(dst)`.
+
+  The copy is a separate document, and every later autosave writes only to
+  it. **Don't `saveAs` from the user's document**: that renames their open
+  document to your file. And never build into it directly. If it has unsaved
+  changes, stop and ask.
 - **When you save a build, make `saveAs` the last call.** From then on, every
   call re-saves the file first. Take screenshots and run checks before the
   save, not after. Save a correction round beside the user's file under a new
@@ -280,6 +317,25 @@ pCmd = qenv.import_pcmd()
 _read_row = qenv.read_row       # tablez/<csv> row for a PSize
 _f = qenv.f                     # float from a row, by column name
 ```
+
+**Prove the file reproduces the live build**: run it in the session as
+`__main__` and capture what it prints. Then compare its report (joint
+closures, object count, weld tally) with the numbers from the live build:
+
+```python
+buf = []; orig = FreeCAD.Console.PrintMessage
+FreeCAD.Console.PrintMessage = buf.append
+try:
+    exec(compile(open(path).read(), path, "exec"),
+         {"__name__": "__main__", "__file__": path})
+finally:
+    FreeCAD.Console.PrintMessage = orig
+```
+
+Once a macro exists, make **corrections in the macro and re-run it**,
+rather than patching the live model and back-porting. Across several
+correction rounds this keeps the file and the model identical. It also
+gives stable marks for free, because the walk order is in the file (§9.6).
 
 Write the file into `examples/<something>/`, never into the installed
 `Mod/Quetzal/` — that is a separate checkout and not yours to write to. Anything
@@ -405,7 +461,7 @@ the same number:
 |---|---|---|
 | `Bolts_Nuts` ↔ each of its two flanges (or valve ends) | identical on both sides, e.g. 48 230 mm³ at DN200 600# | The nuts sit ~3.85 mm into the flange back faces. The bolt holes *are* cut; the stud set is just short. Equal volume on both sides means it is centred correctly |
 | `Bolts_Nuts` ↔ `Gasket` | a few mm³ | Centring ring OD (`CROD`) is ~0.1 mm past the inner edge of the studs |
-| SW pipe ↔ socket fitting | < 1 mm³ | Pipe-table OD 33.401 vs fitting-table socket 33.4 |
+| SW pipe ↔ socket fitting (incl. a socket union) | ≈ 1 mm³ (0.7–1.2 at DN25) | Pipe-table OD 33.401 vs fitting-table socket 33.4 |
 | `U-Bolt` ↔ support `Beam` | `2·π·(d/2)²·tf`, e.g. 1429.4 mm³ at DN50 on a W6x15 | The legs pass through the top flange, which has no bolt holes cut. A larger value means the legs are in the web (§3.5) |
 
 Recognise them by that symmetry and repetition. Mention them once in the

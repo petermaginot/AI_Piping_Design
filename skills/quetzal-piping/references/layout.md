@@ -335,6 +335,19 @@ and a re-run, not an archaeology exercise.
   object exactly once. Give flange/gasket/stud sets on either side of a valve
   a side name ("kicker valve, elbow side") rather than "near"/"far". Those words
   describe build order and read backwards when you walk the run the other way.
+- **Mark the existing objects too, when you build onto a model.** Asked to
+  mark "each component, including those in the original model", keep the
+  original label after the mark: `[F3] Flange - WN 6in 600# (trap valve,
+  header side)`. The names the user already uses ("Flange", "Flange001")
+  then still find the part. Keep a description table for the existing
+  objects, keyed by FreeCAD `Name`, and put them in the same walk list as the
+  new parts. Then assert that the walk covers **every** object in the
+  document exactly once, old and new.
+- **Prefixes the table above leaves out.** A socket union has no letter of its
+  own, and `[U]` is taken by U-bolts. The launcher used **`[N]`** (`[N1]
+  Union 1in 3000# SW`). Map `SocketTee` → `[T]`, `SocketEll` → `[E]` and
+  `SocketCap` → `[C]` alongside their butt-weld cousins. Say which letter you
+  chose in the report.
 - **Keep marks stable across correction rounds.** The user refers to parts by
   mark ("add a drain to [P7]"). When parts are removed, leave the gaps. New
   parts take the next free number, and a deleted number is never reused for a
@@ -407,3 +420,76 @@ note disappears. The reading was never wrong by 390 mm; it was being asked to
 describe a joint that has no pipe in it.
 
 Padding a dimension to make room is a smell. Ask whether the gap should be zero.
+
+### 9.8 Fabrication economy: weld-inches and stock nipple lengths
+
+Two objectives come up once the geometry is right. Both are about how the
+thing gets built, and both are decided by the topology you choose, not by
+tuning.
+
+#### 9.8.1 Minimising weld-inches
+
+**Weld-inches** = Σ (welds of a size × that size's OD in inches). Settle the
+counting convention with the user and state it in the report. The launcher
+counted:
+- every butt weld and socket weld at its pipe OD (8.625, 6.625, 4.5, 2.375
+  and 1.315 in)
+- an olet-to-run weld at the **branch** OD
+- bolted joints and threaded ends as zero
+
+Record every weld in the build (`B.weld(dn, what)`) and print the tally from
+that list. Don't count by hand.
+
+The levers, with the launcher's numbers:
+
+| Lever | Effect |
+|---|---|
+| Weld fittings **directly** together: elbow on WN, WN on weldolet, tee on the closure WN | removes a pipe and one weld each |
+| **Weldolet instead of a reducing tee** for a branch | 2 × branch OD instead of 1 × run OD + 1 × branch OD, and the run pipe isn't split: 8×4 kicker, weldolet 9.0 vs tee 13.1 |
+| **One skewed leg instead of two orthogonal ones** between two points | one fewer elbow and pipe: −2 welds (−9.0 at 4") |
+| **Share a tap**: vent valve on the equalization line's tee instead of its own olet | −2 socket welds per tap |
+| **No pup** unless something has to sit on it | a minor-barrel pup that only carries a sockolet costs one 6" weld (6.6) |
+
+Report the alternatives you rejected, with their cost, beside the chosen
+design. The user may then **deliberately buy weld-inches back** for
+constructability or operability. The launcher went from 83.3 to 97.2 when
+the user asked for:
+- a tee instead of the weldolet
+- a flange pair as a break-out joint
+- a union in the equalization line
+- a vent on the barrel itself
+
+That is their call. Once they make it, don't argue for the cheaper design
+again.
+
+#### 9.8.2 Stock nipple lengths (NPS 2 and smaller)
+
+Small-bore nipples come pre-cut in **3, 4, 6 and 12 in**. Use them wherever a
+segment's length is **free**. Only cut pipe where two fixed points fix the
+length.
+
+1. **Find the fixed chains.** A chain of fittings and pipes between two
+   fixed taps (two sockolets, a sockolet and a tee) has a fixed total. Every
+   other segment's length is a free choice: a nipple into a vent valve, the
+   stub off a tee to the next elbow, one of the two pipes either side of an
+   in-line valve.
+2. **Make the free ones stock lengths**, as named constants, and derive the
+   work points from them. The segment then really is that length:
+
+   ```python
+   E_ELL = f(row("Elbow_3000lb_SW.csv", "DN25", BendAngle="90"), "E")
+   WP_ell = wpos(tee, 2) + branch_dir * (EQ_TOP_L + E_ELL)   # [P18] = 6" exactly
+   ```
+
+   Socket-weld cut lengths run socket-bottom to socket-bottom (§3.3), so a
+   6" nipple spans the ports, and the fitting's `E` adds to the work-point
+   distance.
+3. **Let the fixed chain absorb the difference**, cut to length, and say so.
+   When a fixed chain has several pieces, test whether an all-stock
+   combination fits, and report the nearest miss. On the launcher, a 12" +
+   12" + 4" set of pipes came out 1.9 mm long, so [P14] and [P15] stayed cut.
+4. **Flag each small-bore pipe as STD or CUT in the report**, and describe it
+   as `NIPPLE 6 IN` or `PIPE, CUT TO LENGTH` in the BOM.
+
+Moving a free length moves things downstream: the in-line valve rose 94 mm
+when its upper pipe became a 12" nipple. Say what moved.
