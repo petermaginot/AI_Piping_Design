@@ -8,9 +8,10 @@ Part of the `draft-2d` skill. Section numbers (§) are shared across the skill's
 
 ### 9.1 Capture
 
-Do not rely on the `view_control` screenshot tool writing the file — it may
-return base64 without leaving anything on disk. Save explicitly, then `Read`
-the file:
+Do not use the `view_control` screenshot tool. It ignores `filename`, so
+nothing is written to disk. It returns the image as base64 text, not as an image
+you can see. Any PNG larger than about 38 KB fails with "Failed to send response
+(oversized …)". Save explicitly, then `Read` the file:
 
 ```python
 FreeCADGui.Selection.clearSelection()        # selection renders bright green/blue

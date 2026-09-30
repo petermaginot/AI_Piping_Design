@@ -1,6 +1,6 @@
 ---
 name: quetzal-piping
-description: Build, modify or correct piping (spools, runs, branch connections, pig launchers and receivers) in the user's live FreeCAD session with the Quetzal workbench, over MCP. Works from a text prompt, a hand-drawn isometric or pencil sketch, an existing drawing, or annotated field photographs. Use whenever the user asks to model piping in FreeCAD or Quetzal, or to write a Quetzal macro.
+description: Build, modify or correct piping (spools, runs, branch connections, pig launchers and receivers) in the user's live FreeCAD session with the Quetzal workbench, over MCP. Works from a text prompt, a hand-drawn isometric or pencil sketch, an existing drawing, or annotated field photographs. Also groups a finished model into spool part containers plus an assembly-material container. Use whenever the user asks to model piping in FreeCAD or Quetzal, to write a Quetzal macro, or to group a model into spools.
 ---
 
 # AI-assisted piping design with Quetzal
@@ -32,6 +32,7 @@ through the chain) apply to every source, not only to isometrics.
 | 11 | Building from a text prompt | [references/text-prompt.md](references/text-prompt.md) | source is prose |
 | 12 | Building from a field photograph | [references/photograph.md](references/photograph.md) | source is a photo |
 | 13 | Worked assembly: a pig launcher; adding one to an existing header | [references/pig-launcher.md](references/pig-launcher.md), with [pig_trap_guidelines.md](references/pig_trap_guidelines.md) and [Trap_diagram.svg](references/Trap_diagram.svg) | pig trap, launcher or receiver |
+| 14 | Grouping a finished model into spool part containers and an assembly-material container, per header or flat | [references/spool-grouping.md](references/spool-grouping.md) | user asks to group, organise or split a model into spools/parts |
 | — | Fill-in spec template to offer when a prompt is under-specified | [references/spool_prompt_template.md](references/spool_prompt_template.md) | as needed |
 
 Outside this folder, at the repository root: `quetzal_env.py` (Quetzal path
@@ -256,8 +257,8 @@ running session. If the user changes workbench source, they must sync it across
 and then reload it (`importlib.reload(pCmd)`, plus any module it imports that
 also changed, or restart FreeCAD) before it takes effect. The MCP
 `reload_modules` tool is **not** this. It reloads only the MCP addon's own
-handlers, and in doing so it empties the `execute_python` namespace, so re-send
-the §2 preamble after it.
+handlers. The `execute_python` namespace survives it, but a restart of FreeCAD
+does not, so re-send the §2 preamble after one.
 
 ---
 
@@ -425,6 +426,12 @@ for name, a, ia, b, ib in joints:
     print("%-24s gap=%.6f mm  dot=%+.6f" % (name, gap, dot))   # want 0.000000, -1.000000
 ```
 
+**Never bind a name called `result`.** When a call's last statement is not an
+expression, the bridge reports the value of `result` from the namespace. That
+namespace persists, so after one call sets `result`, every later call echoes
+the stale value as if it were that call's output. Print what you want to see,
+or end the call on a bare expression.
+
 Every joint must close at **gap ≈ 0 and dot ≈ −1** (anti-parallel = face to
 face). A non-zero gap means a missed `recompute()` or a wrong port index; a dot
 near +1 means you mated two ports that both point the same way.
@@ -481,14 +488,16 @@ v.viewIsometric(); v.fitAll()
 v.saveImage(path, 1100, 800, "White")
 ```
 
-`view_control screenshot` base64-encodes the PNG into the socket frame, against a
-50 KB `MAX_MESSAGE_SIZE`. Anything past roughly 800×600 — even on a five-object
-scene — exceeds it, and the handler then *discards the response*, so the call
-hangs for the full 120 s and returns a timeout while the real message
-("Refusing to send oversized message … would desync framing") appears only in the
-FreeCAD console. It also ignores the `filename` argument entirely, writing to a
-temp file it deletes. `saveImage` has no size ceiling, honours the path, takes
-well under a second, and lets you set the background.
+`view_control screenshot` base64-encodes the PNG into one socket frame, against a
+50 KB `MAX_MESSAGE_SIZE`. The limit applies to the encoded size, not the resolution.
+A one-box scene fits at 1100×800, but a scene with 70 shaded solids fails even at
+400×300 (a 52 KB PNG). When it is over the limit, the call returns at once with
+"Failed to send response (oversized or socket error); result discarded", and the
+image is lost. When it fits, the image comes back as base64 text inside the JSON
+result, not as an image you can see. It also ignores the `filename` argument and
+writes nothing to disk. (All checked live on AICopilot 8.2.2.) `saveImage` has no
+size ceiling, honours the path, takes well under a second, and lets you set the
+background.
 
 Finally, respect the session you borrowed: the build is one undo (§2.1), nothing
 is saved unless asked (which, with the bridge's autosave on, means no saved

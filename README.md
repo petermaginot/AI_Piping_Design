@@ -39,7 +39,9 @@ other piping CAD packages, but nothing here is abstracted for that yet.
 |---|---|
 | [FreeCAD](https://www.freecad.org/) | 0.21 or later, with a **GUI session** — see the note below |
 | [Quetzal workbench](https://github.com/oddtopus/quetzal) | supplies `pCmd` and the `tablez/` dimension tables |
-| [blwfish/freecad-mcp](https://github.com/blwfish/freecad-mcp) | lets the agent drive that live session |
+| [blwfish/freecad-mcp](https://github.com/blwfish/freecad-mcp) | lets the agent drive the live session |
+
+Note that if a MCP add-on other than the blwfish one is used you will need to adapt the skill to that MCP handler's quirks. This is something your LLM should be able to handle.
 
 Quetzal's `execute()` methods write to `fp.ViewObject`, so `Pipe`, `Flange` and
 friends only build geometry when a GUI ViewObject exists. Headless `freecadcmd`
@@ -127,11 +129,11 @@ file to read, and when. Section numbers (§) are shared across a skill's files.
   | `Trap_diagram.svg` | The canonical pig trap layout, referenced by the guidelines. |
 
 - [`techdraw-drawing`](skills/techdraw-drawing/SKILL.md): turning a
-  finished spool into a drawing. The welded-only `App::Part` container (which is
+  finished spool into a dimensioned TechDraw drawing. The welded-only `App::Part` container (which is
   also the performance control), making views actually project, the view
   coordinate frame, the BOM spreadsheet and its text-parsing trap, balloons,
   dimensioning to work points with `AutoCorrectRefs` off, and verifying the page
-  numerically.
+  numerically. 
 - [`draft-2d`](skills/draft-2d/SKILL.md): flat 2D artwork with
   the Draft workbench. The build-script / `importlib.reload` loop, `MakeFace`
   defaults, ShapeString text and text on an arc, baking arrays, measuring a

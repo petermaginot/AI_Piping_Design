@@ -69,6 +69,10 @@ while time.time() - t0 < 90.0:
     FreeCADGui.updateGui(); time.sleep(0.2); doc.recompute()
 ```
 
+Keep the budget under the bridge's 120 s ceiling for one `execute_python`
+call. Past that, the call returns a `job_id` instead of a result, and the code
+is still running. Wait for it with `poll_job` before sending anything else.
+
 When a view reports empty, check it again a few seconds later before you
 doubt the build.
 
