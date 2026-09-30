@@ -162,4 +162,5 @@ needs to check the build against what they asked for:
   reconciliation — quoted, not summarised as "verified".
 - The document you built into, and the save path, or a note that nothing was
   written to disk. Include the state of the bridge's `AutoSaveBeforeRiskyOp`
-  preference (§2.1), and any file it saved.
+  preference (§2.1), and any file it saved (reported in each call's `autosave`
+  field).

@@ -149,10 +149,12 @@ Verify the session before building:
 print(FreeCAD.Version()[:3], "GUI:", FreeCAD.GuiUp)
 print("workbench:", FreeCADGui.activeWorkbench().name())   # want QuetzalWorkbench
 print("QDIR:", QDIR)
-print("docs:", {n: d.FileName for n, d in FreeCAD.listDocuments().items()})
+print("docs:", {n: (d.FileName, FreeCADGui.getDocument(n).Modified)   # path, unsaved?
+               for n, d in FreeCAD.listDocuments().items()})
 print("bridge autosave:", FreeCAD.ParamGet(
     "User parameter:BaseApp/Preferences/Mod/AICopilot"
 ).GetBool("AutoSaveBeforeRiskyOp", True))                  # see §2.1
+print("__name__:", __name__)        # "builtins" = an older AICopilot, see §2.1
 ```
 
 ### 2.1 Choose the target document deliberately
@@ -170,13 +172,23 @@ into the installed `Mod/Quetzal/` directory.
 
 **The MCP bridge saves for you unless it is told not to.** Before running your
 code, every `execute_python` call (and every `part_operations` boolean) saves the
-**active** document, if it has a file path. It writes the state left by the
-*previous* call, to the path it was opened from. A new, unsaved document is
-never touched. The AICopilot preference `AutoSaveBeforeRiskyOp` controls this,
-and it defaults to on. So:
+**active** document if it has a file path *and* unsaved changes (the title-bar
+asterisk, `FreeCADGui.getDocument(name).Modified`). It writes the state left by
+the *previous* call, to the path it was opened from. A clean document is not
+rewritten, and a new, unsaved document is never touched. When a save happens, the
+tool response carries an `"autosave": "saved: <path>"` field; read it. The
+AICopilot preference `AutoSaveBeforeRiskyOp` controls this, and it defaults to on.
 
-- Read it in the preamble (§2). If it is on and any open document has a
-  `FileName`, **stop and tell the user** before building. Offer to switch it off
+**An older AICopilot saves the active document on every call, changed or not,
+and does not report it.** The preamble tells you which one you have: `__name__`
+prints `"__main__"` on a current build and `"builtins"` on an older one. On an
+older build, any saved file that becomes active is rewritten by your next call.
+So:
+
+- Read the preference and each document's unsaved-changes flag in the preamble
+  (§2). If autosave is on and one of the user's saved files has unsaved changes
+  (on an older build: if any open document has a `FileName`), **stop and tell
+  the user** before building. Offer to switch it off
   (`FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/AICopilot")
   .SetBool("AutoSaveBeforeRiskyOp", False)`), and do it only if they agree.
   Mention the setting again at handover.
@@ -194,16 +206,17 @@ and it defaults to on. So:
   Rotate those by the placement to get every port in world coordinates.
   That is enough to plan an addition to an existing model before the first
   `execute_python`.
-- Once you `saveAs` a document into the repo, every later call rewrites it while
-  it stays active. Run post-save checks against a scratch document, or accept
-  the resulting git diff.
+- Once you `saveAs` a document into the repo, every later call that follows a
+  change to it re-saves it while it stays active. Read-only checks don't (on an
+  older build they do). Make further changes in a scratch document, or accept the
+  resulting git diff.
 - **Create your build document with `view_control` `create_document` *before*
   the first `execute_python`.** The new, unsaved document becomes the active
-  one, so the autosave that fires on that first call has nothing to write, even
-  when the user has a saved model open. This matters most in a correction round
-  after the user has saved your last build into the repo: that file is still
-  open and probably still active. Rebuild into a fresh document created this
-  way, and the user's file is never rewritten mid-build.
+  one, so the autosave that fires on that first call has nothing to write,
+  whatever the user has open. This matters most in a correction round after the
+  user has saved your last build into the repo: that file is still open and
+  probably still active. Rebuild into a fresh document created this way, and the
+  user's file is never rewritten mid-build.
 - **To modify an existing model the user has open, copy the file on disk and
   open the copy.** The user's `Header_to_make_piggable.FCStd` was already
   open (as `Unnamed`) with no unsaved changes. The safe sequence:
@@ -217,11 +230,13 @@ and it defaults to on. So:
   it. **Don't `saveAs` from the user's document**: that renames their open
   document to your file. And never build into it directly. If it has unsaved
   changes, stop and ask.
-- **When you save a build, make `saveAs` the last call.** From then on, every
-  call re-saves the file first. Take screenshots and run checks before the
-  save, not after. Save a correction round beside the user's file under a new
-  name, such as `..._rev1.FCStd`, unless they asked you to overwrite it. Their
-  copy may be untracked, with nothing in git to recover it from.
+- **When you save a build, make `saveAs` the last call that changes it.** From
+  then on, a call after any change re-saves the file first. Checks and
+  screenshots after the save are fine, but on an older build every call
+  re-saves, so run them before the save there. Save a correction round beside
+  the user's file under a new name, such as `..._rev1.FCStd`, unless they asked
+  you to overwrite it. Their copy may be untracked, with nothing in git to
+  recover it from.
 
 ### 2.2 The session namespace persists — and that cuts both ways
 
@@ -229,11 +244,12 @@ Names defined in one `execute_python` call are visible in every later call, whic
 is what lets you build incrementally and re-query the model afterwards (§10).
 Two consequences:
 
-- **`__name__` is `"builtins"`, not `"__main__"`.** An `if __name__ ==
-  "__main__":` guard carried over from the old macro skeleton will **silently
-  never fire** — your build code appears to run and does nothing. Do not use an
-  entry guard in code sent over MCP. (It is still correct in a `.py` file written
-  out under §7.1, where the file *is* run as `__main__`.)
+- **Leave out the `if __name__ == "__main__":` entry guard in code sent over
+  MCP.** A current AICopilot sets `__name__` to `"__main__"`, so the guard runs,
+  but it adds nothing. On an older build `__name__` is `"builtins"`, and the
+  guard **silently never fires**: your build appears to run and does nothing.
+  (It is still correct in a `.py` file written out under §7.1, where the file
+  *is* run as `__main__`.)
 - **Stale definitions leak between builds.** A `DIMENSIONS` dict or helper left
   over from an earlier job is still bound, so a later build that forgets to
   redefine one silently uses the old value. Redefine every name your build
@@ -426,11 +442,12 @@ for name, a, ia, b, ib in joints:
     print("%-24s gap=%.6f mm  dot=%+.6f" % (name, gap, dot))   # want 0.000000, -1.000000
 ```
 
-**Never bind a name called `result`.** When a call's last statement is not an
-expression, the bridge reports the value of `result` from the namespace. That
-namespace persists, so after one call sets `result`, every later call echoes
-the stale value as if it were that call's output. Print what you want to see,
-or end the call on a bare expression.
+**Print what you want to see, or end the call on a bare expression.** When a
+call's last statement is not an expression, the bridge reports the value of a
+variable named `result` if the call set one. On an older AICopilot (`__name__`
+is `"builtins"`, §2) it reports a `result` left over from *any* earlier call.
+Every later call then echoes that stale value as if it were its own output. On
+such a build, never bind the name `result`.
 
 Every joint must close at **gap ≈ 0 and dot ≈ −1** (anti-parallel = face to
 face). A non-zero gap means a missed `recompute()` or a wrong port index; a dot
@@ -479,8 +496,11 @@ valve's gearbox against a pipe nearby is the usual culprit (§3.2.1).
 
 ### 10.3 Show it, then leave the session clean
 
-`view_control` `fit_all` + `set_view isometric`, then capture. **Use `saveImage`
-via `execute_python`, not the `screenshot` operation:**
+`view_control` `fit_all` + `set_view isometric`, then
+`view_control` `screenshot` (e.g. `width=1100, height=800`). It returns the image
+for you to look at, and with `filename=<path>.png` it also keeps a copy on disk.
+It renders on FreeCAD's own background. When the user needs a plain one, for a
+deliverable, use `saveImage` through `execute_python`:
 
 ```python
 v = FreeCADGui.ActiveDocument.ActiveView
@@ -488,17 +508,12 @@ v.viewIsometric(); v.fitAll()
 v.saveImage(path, 1100, 800, "White")
 ```
 
-`view_control screenshot` base64-encodes the PNG into one socket frame, against a
-50 KB `MAX_MESSAGE_SIZE`. The limit applies to the encoded size, not the resolution.
-A one-box scene fits at 1100×800, but a scene with 70 shaded solids fails even at
-400×300 (a 52 KB PNG). When it is over the limit, the call returns at once with
-"Failed to send response (oversized or socket error); result discarded", and the
-image is lost. When it fits, the image comes back as base64 text inside the JSON
-result, not as an image you can see. It also ignores the `filename` argument and
-writes nothing to disk. (All checked live on AICopilot 8.2.2.) `saveImage` has no
-size ceiling, honours the path, takes well under a second, and lets you set the
-background.
+Then `Read` the file to look at it. On an older AICopilot (`__name__` is
+`"builtins"`, §2), always use `saveImage`. There, `screenshot` packs the image
+into a 50 KB socket frame: it fails with "Failed to send response (oversized …)"
+for any real model, returns base64 text rather than an image even when it fits,
+and ignores `filename`.
 
 Finally, respect the session you borrowed: the build is one undo (§2.1), nothing
-is saved unless asked (which, with the bridge's autosave on, means no saved
-document was ever active: §2.1), and no `.FCStd` is written into `Mod/Quetzal/`.
+is saved unless asked (so no saved document with unsaved changes was active
+while autosave was on: §2.1), and no `.FCStd` is written into `Mod/Quetzal/`.

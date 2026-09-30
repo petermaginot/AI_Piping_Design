@@ -207,8 +207,9 @@ Report, briefly:
 - the containers and how many members each holds;
 - every judgement call: where supports went, where shared tie-in material went,
   what a spool that spans a flange break was left as;
-- that nothing was saved (or that the bridge's autosave was on and may already
-  have written the user's file, §2.1);
+- that nothing was saved, or which files the bridge's autosave wrote (each
+  call's `autosave` field). On an older AICopilot, which doesn't report saves,
+  say that autosave was on and may already have written the user's file (§2.1);
 - that the change is one undo.
 
 Do not write a `.py` file for this unless asked (§7.1).

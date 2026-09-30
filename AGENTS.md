@@ -7,7 +7,7 @@ the task and follow it before you build anything:
 | Task | Skill |
 |---|---|
 | Build or modify piping with Quetzal | [`skills/quetzal-piping/SKILL.md`](skills/quetzal-piping/SKILL.md) |
-| Make a TechDraw drawing of a model | [`skills/techdraw-drawing/SKILL.md`](skills/techdraw-drawing/SKILL.md) |
+| Make a TechDraw drawing of a model, or a construction isometric (Quetzal-generated, NTS, from the model or a PCF) | [`skills/techdraw-drawing/SKILL.md`](skills/techdraw-drawing/SKILL.md) |
 | Make 2D artwork with Draft | [`skills/draft-2d/SKILL.md`](skills/draft-2d/SKILL.md) |
 
 Each `SKILL.md` has a table that says which of its `references/` files to read,

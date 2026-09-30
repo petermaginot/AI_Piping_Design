@@ -90,18 +90,24 @@ such as "§10.3" means the file listed for §10 below.
 import FreeCAD, FreeCADGui, Draft
 print(FreeCAD.Version()[:3], "GUI:", FreeCAD.GuiUp)
 print("workbench:", FreeCADGui.activeWorkbench().name())
-print("open documents:", {n: d.FileName for n, d in FreeCAD.listDocuments().items()})
+print("open documents:", {n: (d.FileName, FreeCADGui.getDocument(n).Modified)
+                          for n, d in FreeCAD.listDocuments().items()})
 print("bridge autosave:", FreeCAD.ParamGet(
     "User parameter:BaseApp/Preferences/Mod/AICopilot"
 ).GetBool("AutoSaveBeforeRiskyOp", True))
+print("__name__:", __name__)        # "builtins" = an older AICopilot
 ```
 
 **The MCP bridge saves the active document before every `execute_python`
-call**, if the document has a file path. The AICopilot preference
+call**, if the document has a file path and unsaved changes. The tool response
+then carries `"autosave": "saved: <path>"`. The AICopilot preference
 `AutoSaveBeforeRiskyOp` controls this, and it defaults to on. Your own freshly
 created build document has no path, so it is safe until `save()` (§11). A user's
-file that happens to be active is not. If autosave is on and any of the user's
-saved files is open, **stop and tell them**. Offer to switch it off
+file that happens to be active is safe until something changes it. An older
+AICopilot (`__name__` prints `"builtins"`) saves the active document on every
+call, changed or not, without saying so. If autosave is on and one of the user's
+saved files has unsaved changes (on an older build: if one is open at all),
+**stop and tell them**. Offer to switch it off
 (`.SetBool("AutoSaveBeforeRiskyOp", False)`), do it only if they agree, and
 never activate their document yourself.
 
@@ -362,10 +368,11 @@ It costs nothing — Qt is already loaded — it makes the deliverable PNG and t
 deliverable SVG the same artwork by construction, and it means every save
 exercises the export path that §10 says is the one that breaks.
 
-After `saveAs` the document has a path, so with the bridge's autosave on (§2)
-every later `execute_python` call rewrites the `.FCStd` while that document is
-active. Close or recreate it (the §3 loop already does) before running more
-checks, or expect the extra git diff.
+After `saveAs` the document has a path. With the bridge's autosave on (§2),
+any later change to it is written back to the `.FCStd` on the next call while
+that document is active. Read-only checks leave it alone, except on an older
+AICopilot, where every call rewrites it. Close or recreate it (the §3 loop
+already does) before changing anything, or expect the extra git diff.
 
 Report the paths you wrote, and say plainly whether anything was staged or
 committed.

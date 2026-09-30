@@ -8,10 +8,12 @@ Part of the `draft-2d` skill. Section numbers (§) are shared across the skill's
 
 ### 9.1 Capture
 
-Do not use the `view_control` screenshot tool. It ignores `filename`, so
-nothing is written to disk. It returns the image as base64 text, not as an image
-you can see. Any PNG larger than about 38 KB fails with "Failed to send response
-(oversized …)". Save explicitly, then `Read` the file:
+Capture with `saveImage`, not the `view_control` screenshot tool. Comparing
+against a reference needs a white background, and `saveImage` sets one, while
+the screenshot tool renders on FreeCAD's own gradient. (The tool is fine for a
+quick look on a current AICopilot. On an older one, where `__name__` is
+`"builtins"`, it fails outright for any real drawing.) Save explicitly, then
+`Read` the file:
 
 ```python
 FreeCADGui.Selection.clearSelection()        # selection renders bright green/blue

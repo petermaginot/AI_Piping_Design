@@ -128,7 +128,9 @@ decimal inches (§11.5.5).
 
 Not on the isometric. TechDraw foreshortens it, so the numbers are wrong — which
 is why the reference drawing dimensions the top view instead, despite the
-isometric being the view a fabricator reads.
+isometric being the view a fabricator reads. When the fabricator needs a
+dimensioned iso, that is a construction isometric, which Quetzal generates
+not to scale with true lengths printed (§17).
 
 Stacking two parallel dimensions on the same side overlaps their text however
 far apart you put the lines. Put the second one on the opposite side. Leave
