@@ -1,0 +1,26 @@
+{
+  "case": "sketch_3in_300_tee_drop_spool",
+  "source": "pencil sketch: IMG_2619.jpg",
+  "reference": "make_sketch_3in_300_tee_drop_spool.FCStd",
+  "parts": {
+    "Elbow DN80 SCH-STD": 1,
+    "Flange DN80 SCH-STD 300lb": 3,
+    "Outlet DN25 3000lb": 1,
+    "Pipe DN80 SCH-STD": 4,
+    "Tee DN80 SCH-STD": 1
+  },
+  "pipe_length": {
+    "DN80": 2903.65
+  },
+  "joints": 8,
+  "joints_failing": 0,
+  "open_ends": 4,
+  "end_spans": [
+    612.981,
+    1193.907,
+    1509.623,
+    1559.361,
+    1600.2,
+    1812.5
+  ]
+}

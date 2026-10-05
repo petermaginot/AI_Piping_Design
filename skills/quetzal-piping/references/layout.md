@@ -353,6 +353,11 @@ and a re-run, not an archaeology exercise.
   parts take the next free number, and a deleted number is never reused for a
   different part. Offer a full renumber, but don't do one without being asked.
   A renumber silently repoints every mark in the conversation.
+- **To change a part, edit it in place rather than replacing it.** A
+  socket-weld cap that becomes threaded, or a pipe shortened to make room for
+  a valve, keeps its FreeCAD `Name`, its mark, its spool container and its
+  place on any iso page if you set its properties, recompute and re-seat it
+  with `alignTwoPorts`. A delete-and-recreate loses all four (§13.2).
 - **Print a report** (`FreeCAD.Console.PrintMessage`) containing: the work-point
   table with elevations; every pipe cut length with its label; the take-outs
   actually read from `tablez/`; every short-pipe adjustment (§9.2.2); derived

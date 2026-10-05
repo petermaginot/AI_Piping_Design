@@ -109,8 +109,8 @@ So, for spools grouped per `quetzal-piping` §14:
 - **Welded spool only** (the usual shop iso): pass `[spool_part]`.
 - **Spool plus its field material:** pass `[spool_part, gasket, studs,
   valve, …]` for the joints at its ends. A shared joint's material belongs on
-  one sheet, not both. Ask, or follow the boundary the user stated (§14.5 of
-  that skill).
+  one sheet, not both. Ask, or follow the boundary the user stated
+  (`quetzal-piping` §14.5).
 
 **The container label becomes the pipeline reference.** It is the page title,
 the drawing number and note 4. Name containers for a person before you
@@ -313,6 +313,30 @@ it, check it is not `None`, and print:
 - **Every BOM number ballooned.** `{n for n, _c, _a in sheet.balloons}`
   equals `{it.number for it in sheet.bom}`. A stud set shares its gasket's
   balloon, and still appears in that set.
+- **Every drawn piece ballooned, not just every number.** The set check above
+  passes when one item has two pieces and only one balloon. Count per item:
+
+  ```python
+  cnt = {}
+  for n, _c, _a in sheet.balloons: cnt[n] = cnt.get(n, 0) + 1
+  for it in sheet.bom:
+      print(it.number, len(it.comps), cnt.get(it.number, 0), it.description)
+  ```
+
+  Pipe pieces butted end to end share one balloon. Bolt sets share their
+  gasket's. Every other shortfall is a missing balloon.
+
+  The receiver's barrel spool showed this. The barrel axis is one straight run
+  in the graph (`graph.runs`): minor pipe, eccentric reducer, major pipe,
+  kicker tee, closure pup. Quetzal up to commit 665c5f3 gave each pipe item
+  one balloon **per run**, so the closure pup (the same 12" item as the major
+  pipe) got none. The fix in `iso/iso_bom.py` (`_pipe_stretches`) shares a
+  balloon only between pieces that meet at a graph node. A tee or reducer
+  between them keeps them apart.
+
+  If an installed Quetzal predates the fix, report the missing balloon as a
+  generator issue. You cannot add one to the SVG that survives `update()`
+  (§17.3).
 - **Every dimension on a model work point, with the right value.** Each
   `Dimension` has node ids `a`, `b`, a true `value` in mm and its printed
   `text`. The nodes are in world mm (`sheet.layout.graph.nodes[i].pos`).
@@ -370,7 +394,19 @@ fails, find out which side is wrong before changing anything.
   scale the drawing.
 
 Then **look at it.** Render the whole sheet with the snippet in §14 and read
-the PNG. Look for:
+the PNG. For the iso drawing alone, without opening a page window, render
+the view's own SVG. (`TechDraw.writeSVGPage` does not exist.)
+
+```python
+from PySide import QtSvg, QtGui
+open(svg_path, "w", encoding="utf-8").write(view.Symbol)       # the generated sheet SVG
+r = QtSvg.QSvgRenderer(svg_path)                               # viewBox = sheet mm
+img = QtGui.QImage(2400, 1552, QtGui.QImage.Format_ARGB32); img.fill(QtGui.QColor("white"))
+p = QtGui.QPainter(img); r.render(p); p.end(); img.save(png_path)
+```
+
+The BOM table and notes are separate views, so they do not appear in that
+render. Look for:
 - balloons or dimension text on top of one another;
 - the notes running into the BOM (also a warning);
 - a title cut short with "…".

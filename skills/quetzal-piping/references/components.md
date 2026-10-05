@@ -28,6 +28,8 @@ part; you usually create at the origin and snap with `alignTwoPorts` afterward.
 | Socket tee | `makeSocketTee(propList, pos, Z, insertOnBranch, rating)` | `[DN, DN2, OD, OD2, A, C, D, E, G, Conn]` (§3.3) |
 | Socket coupling | `makeSocketCoupling(propList, pos, Z)` | `[DN, DN2, OD, OD2, A, C, D, E, Conn]` — reducing rows included (§3.3) |
 | Socket union | `makeSocketUnion(propList, pos, Z)` | `[DN, OD, A, C, D, E, Conn]` (§3.3) |
+| Hex bushing (threaded) | `makeHexBushing(propList, pos, Z)` | `[DN, DN2, OD, OD2, F, C, L, L2, D, Conn]` — 1:1 onto `Bushing_B16.11.csv`; male end is port **0** (§3.3.2) |
+| Hex plug (threaded) | `makeHexPlug(propList, pos, Z)` | `[DN, OD, F, C, L, Conn]` — 1:1 onto `Plug_B16.11.csv`; mates via port **0** (§3.3.2) |
 | Beam (support) | `makeBeam(propList, pos, Z)` | `[rating, SSize, stype, H, W, ta, tf, Height]` (§3.5) |
 | U-bolt (support) | `makeUbolt(propList, pos, Z)` | `[PSize, ClampType, C, H, d]` — no `PortDirections`, place by `Placement` (§3.5) |
 
@@ -87,7 +89,10 @@ outlet = pCmd.makeOutlet(
   `"TOR"` at element [0]. Its `B` is `OD + 0.001`, which is enough taper to
   avoid the zero-taper crash described below. Only the fitting body is
   tabulated, not the TOR plug or closure, so say so in the report. A cap on it
-  (`makeSocketCap`, mated port 0 to the outlet's port 0) is the nearest stand-in.
+  is the nearest stand-in. **TOR caps are threaded**, so use the threaded cap
+  (§3.3.1): `makeSocketCap` with a `Cap_3000lb_TH.csv` row and `Conn = "TH"`,
+  `PRating = "3000lb_TH"`, mated port 0 to the outlet's port 0. A user
+  corrected a socket-weld cap here.
 - **Measure an outlet's station along the pipe axis, not as a distance.**
   `outletPlacementOnPipe` puts `Placement.Base` on the pipe's *outer surface*.
   `(outlet.Placement.Base - pipe_port0).Length` therefore includes the radius
@@ -149,7 +154,7 @@ outlet = pCmd.makeOutlet(
 **`flgPropList is not None`** (that presence selects the flanged path). It takes
 two lists:
 
-- `propList = [DN, VType, H, Kv, Conn, BottomH?, TopH?]` — `H` = face-to-face
+- `propList = [DN, VType, H, Kv, Conn, BottomH?, TopH?, WheelD?]` — `H` = face-to-face
   length, `Conn` = pressure class (e.g. `"300lb"`), `VType` = the CSV valve type
   (e.g. `"Ball_LongPatternRF"`). Data file `Valve_Ball_<class>RF.csv`
   (cols `PSize;VType;H;Kv;Conn`), keyed by the run DN. (Flanged tables are the
@@ -158,7 +163,25 @@ two lists:
   from the matching blind-flange table `Flange_ASME-BL-RF-<class>.csv`. It draws
   the valve's **integral end flanges**, so do NOT add separate flanges/gaskets for
   the valve's own faces.
-- `actuator` = `"Handle"` (default) or `"Gearbox"`.
+- `actuator` = `"Handle"` (default), `"Handle-closed"` or `"Gearbox"`. Flanged
+  **gate and globe** valves take `"Handwheel"`, `"Handwheel-closed"`,
+  `"Gearbox"` or `"Gearbox-closed"`, and globes also take `"Pneumatic"`. The
+  `makeValve` docstring has the current list.
+- **The `-closed` variants show the valve's state.** On a ball valve the
+  lever lies across the flow; on a gate valve the handwheel sits lower on
+  the stem (223 mm at DN200 600#). There is no closed gearbox for a ball
+  valve. `Actuator` is a plain string: set it on an existing valve and
+  `recompute()` that one object. The ports and placement do not change, so
+  nothing needs re-seating. It takes about 0.8 s for a gate valve and 0.1 s
+  for a ball valve.
+
+**Matching an existing valve** ("match the other valves' style") means four
+things, all read off the existing object rather than assumed:
+- the same table row;
+- its `Actuator` property;
+- its roll, meaning the world direction of its local +Y (§3.2.1);
+- its colour. A new valve comes out in the default grey. Copy
+  `ViewObject.ShapeAppearance` and `ShapeColor` from the existing one.
 
 **Other flanged families follow the same call** with a different file:
 `Valve_Gate_<class>RF.csv`, `Valve_Plug_…`, `Valve_Check_Swing_…`,
@@ -239,10 +262,16 @@ reports a false gap of one face-to-face length.
 on your own.** `TopH`/`WheelD` in the valve tables are generous, so a gearbox
 on a drain valve tucked under a large barrel can overlap the barrel (8130 mm³
 on a DN50 drain under a DN300 barrel). If the user specified that orientation,
-build it, report the overlap with its volume, and offer a fix, such as the
-smallest spacer pipe that clears it (found by translating a copy of the valve
-shape until `common()` is empty). The user may know the real actuator is
-smaller. If the orientation was *your* default, choose a clear one and say so.
+build it, report the overlap with its volume, and offer fixes. List the
+cheapest first:
+- **a lever handle** (`"Handle-closed"`) instead of a gearbox. On the
+  receiver this cleared the same 8130 mm³ overlap with no change to the
+  piping, and it was the fix the user chose (§13.2);
+- the smallest spacer pipe that clears it, found by translating a copy of the
+  valve shape until `common()` is empty.
+
+The user may know the real actuator is smaller. If the orientation was
+*your* default, choose a clear one and say so.
 
 #### 3.2.2 Small-bore socket-weld valves
 
@@ -307,6 +336,61 @@ Two things to exploit and one to report:
    coupling-length and visibly shorter than a real one. Say so rather than
    letting the user find it.
 
+#### 3.3.1 Threaded fittings (the `_TH` tables)
+
+Threaded ells, tees, couplings, caps, unions and olets use the **same makers
+and classes** as the socket-weld ones, with `Conn = "TH"`, from their own
+tables. Threads are not modelled. The socket depth is the NPT thread
+engagement, (L1+L2)/2 per ASME B1.20.1 (e.g. 13.75 mm at DN25), so the ports
+sit at the thread bottom exactly as in §3.3.
+
+| File | Source | Notes |
+|---|---|---|
+| `Elbow_{2000,3000,6000}lb_TH.csv` | ASME B16.11 | 90 and 45 rows; `E = A − engagement` |
+| `Tee_{2000,3000,6000}lb_TH.csv` | ASME B16.11 | reducing-branch rows reuse the run-size dimensions |
+| `Coupling_{3000,6000}lb_TH.csv` | ASME B16.11 | `A` = half the overall length; reducing rows use the **large** size's length and engagement for both ends |
+| `Cap_{3000,6000}lb_TH.csv` | ASME B16.11 | |
+| `Union_3000lb_TH.csv` | MSS SP-83 | DN6–DN80; **no header row**, like the SW union table (§6) |
+| `Outlet_3000lb_TH.csv` | the SW olet rows | `E = A − engagement`; pass rating `"3000lb_TH"` |
+
+The forms show these as extra grades (`3000lb_TH`, …). PCF writes screwed
+SKEYs (`ELSC`, `TESC`, `CPSC`, `UNSC`, `KASC`, `THSC`), and a third-party file's
+`SC` SKEYs resolve to the `_TH` tables.
+
+#### 3.3.2 Hex bushings and plugs (B16.11, threaded)
+
+`makeHexBushing` / `makeHexPlug` model hex-head bushings and plugs without
+threads. Table rows are keyed on `PSize` (+ `PSize2` for bushings), DN15–DN100
+male sizes; set `PRating = "B16.11"` afterwards.
+
+- **Port 0 is the male tip** at the local origin, outward `−Z`. Mate it to a
+  fitting's port and the tip bottoms in the socket.
+- `L` (male length, hex to tip) is the B16.11 minimum length E. The tip goes
+  one NPT engagement into a **threaded** fitting, so the hex stands 3–7 mm off
+  its face, as a real made-up joint does. In a socket-weld fitting the socket
+  is deeper, so the gap shrinks or the hex sinks in. Use the `_TH` fittings
+  with bushings and plugs.
+- The hex height is C for bushings and J for plugs, which are taller.
+- **A threaded part going into a socket-weld end (or the reverse): flag it
+  and ask before you build.** Older models predate the threaded tables, so a
+  valve may carry `Conn = "SW"` only as a holdover (§3.2.2), as the 8x12
+  launcher's vent valve `[V2]` did. (The user had it changed to `TH`. The
+  sockolet stayed, because a nipple socket-welded at one end and threaded at
+  the other is common.) Offer the user three choices:
+  - change the female end (the valve to `Conn = "TH"` from the `_TH` table);
+  - change the male part (a socket-weld cap or a pipe stub instead of the
+    plug);
+  - leave it as a stand-in, if the joint doesn't matter for the job.
+
+  Don't pick one silently. A hex plug mated port 0 to port 0 on that
+  valve seats at its socket bottom with zero overlap, so the model looks
+  right either way. Only the joint type is wrong.
+- **HexBushing port 1** is the bottom of the small-end socket at
+  `z = L + C − L2`, outward `+Z`, where `L2` is the small size's engagement.
+  A pipe mated there runs socket-bottom outward, as in §3.3.
+- PCF exports a bushing as `REDUCER-CONCENTRIC` / SKEY `BUSC` and a plug as
+  `CAP` / SKEY `PLSC`. Both import back as the same objects.
+
 ### 3.4 Eccentric reducers
 
 `makeReduct(..., conc=False)` builds an eccentric reducer. Its local frame is
@@ -332,7 +416,10 @@ where you want it:
   `e = (OD − OD2)/2`**: 52.39 mm for 12"×8", upward for FOB. Every fitting
   downstream inherits that. A branch that has to meet a line still at the old
   elevation now has a level change to absorb. Solve it through the chain
-  (§9.3.1) rather than moving the other line. Check the flat side really is
+  (§9.3.1) rather than moving the other line. Or cancel it: a full-size tee
+  on the major barrel, then a second reducer of the **same table row**, flat
+  on bottom, welded onto the branch. It drops the small end by the same `e`,
+  back to the original elevation, with no slope (§13.2). Check the flat side really is
   flat by comparing the pipe bottoms either side (`z_CL − OD/2`). They should
   agree to the table's rounding of `OD2` (0.0025 mm here).
 

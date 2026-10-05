@@ -1,0 +1,23 @@
+{
+  "case": "iso_3in_tee_run",
+  "source": "hand-drawn isometric: IMG_2146.jpg",
+  "reference": "make_iso_3in_tee_run.FCStd",
+  "parts": {
+    "Elbow DN80 SCH-STD": 1,
+    "Flange DN80 No rating 600lb": 1,
+    "Flange DN80 SCH-STD 600lb": 2,
+    "Pipe DN80 SCH-STD": 2,
+    "Tee DN80 SCH-STD": 1
+  },
+  "pipe_length": {
+    "DN80": 1631.85
+  },
+  "joints": 6,
+  "joints_failing": 0,
+  "open_ends": 3,
+  "end_spans": [
+    247.417,
+    1436.608,
+    1524.0
+  ]
+}

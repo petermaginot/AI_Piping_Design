@@ -1,0 +1,29 @@
+{
+  "case": "iso_10in_300_branch_run",
+  "source": "hand-drawn isometric: IMG_2150.jpg with spool_example_BOM.csv",
+  "reference": "make_iso_10in_300_branch_run.FCStd",
+  "parts": {
+    "Elbow DN250 SCH-STD": 2,
+    "Elbow DN50 SCH-XS": 1,
+    "Flange DN250 SCH-STD 300lb": 2,
+    "Flange DN50 No rating 300lb": 2,
+    "Flange DN50 SCH-XS 300lb": 2,
+    "Outlet DN50 Sch-XS": 2,
+    "Pipe DN250 SCH-STD": 2,
+    "Valve DN50 Ball_LongPatternRF": 2
+  },
+  "pipe_length": {
+    "DN250": 1938.45
+  },
+  "joints": 12,
+  "joints_failing": 0,
+  "open_ends": 4,
+  "end_spans": [
+    779.636,
+    1298.588,
+    1643.138,
+    1910.34,
+    1998.255,
+    2025.903
+  ]
+}

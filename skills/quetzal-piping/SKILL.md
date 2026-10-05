@@ -32,6 +32,7 @@ through the chain) apply to every source, not only to isometrics.
 | 11 | Building from a text prompt | [references/text-prompt.md](references/text-prompt.md) | source is prose |
 | 12 | Building from a field photograph | [references/photograph.md](references/photograph.md) | source is a photo |
 | 13 | Worked assembly: a pig launcher; adding one to an existing header | [references/pig-launcher.md](references/pig-launcher.md), with [pig_trap_guidelines.md](references/pig_trap_guidelines.md) and [Trap_diagram.svg](references/Trap_diagram.svg) | pig trap, launcher or receiver |
+| 13.2, 13.3 | Worked assembly: a pig receiver between existing valves; inserting a valve into a run; changing a part in place; joining a launcher and a receiver into one model (merge, rigid move, renumbering marks) | [references/pig-receiver.md](references/pig-receiver.md), after pig-launcher.md | pig receiver, or merging one model into another |
 | 14 | Grouping a finished model into spool part containers and an assembly-material container, per header or flat | [references/spool-grouping.md](references/spool-grouping.md) | user asks to group, organise or split a model into spools/parts |
 | — | Fill-in spec template to offer when a prompt is under-specified | [references/spool_prompt_template.md](references/spool_prompt_template.md) | as needed |
 
@@ -276,6 +277,34 @@ also changed, or restart FreeCAD) before it takes effect. The MCP
 handlers. The `execute_python` namespace survives it, but a restart of FreeCAD
 does not, so re-send the §2 preamble after one.
 
+**A bug in Quetzal itself** (a generator rule, a maker) is fixed in the
+user's **development checkout**, at the path they give you. It is never fixed
+in the installed copy, even when that copy is also a git clone. Then:
+1. add a regression test there, and run the pure-Python suites from its root
+   (`python -m unittest discover -s iso/tests -t .`);
+2. prove the test fails on the old code (`git stash push -- <file>`, run it,
+   `git stash pop`);
+3. prove the fix on the user's real model by loading the dev module for one
+   call and restoring the installed function in a `finally`:
+
+   ```python
+   import importlib.util, iso.iso_bom as ib
+   spec = importlib.util.spec_from_file_location("iso.iso_bom_dev", DEV_PATH)
+   dev = importlib.util.module_from_spec(spec); dev.__package__ = "iso"
+   spec.loader.exec_module(dev)
+   orig = ib.place_balloons
+   try:
+       ib.place_balloons = dev.place_balloons
+       sheet = iso_page.update(view)
+   finally:
+       ib.place_balloons = orig
+   ```
+
+At handover, say that anything regenerated this way reverts on the next
+regenerate until the user syncs the fix into the installed workbench. Leave
+the dev checkout uncommitted unless asked. It may hold the user's own
+unrelated changes.
+
 ---
 
 ## 7. Workflow for the agent
@@ -302,8 +331,8 @@ does not, so re-send the §2 preamble after one.
 5. **Verify numerically in the same session** (§10.2) — port closures, take-out
    reconciliation, `geometric_verification`, `spatial_query`. This is not
    optional and it is not a visual check.
-6. **Show the user the model**: a screenshot (§10.3) plus the report (§9.6 /
-   §11.6). Because you built it live, they can rotate the real thing while
+6. **Show the user the model**: a screenshot (§10.3) plus the report (§8.1,
+   §9.6, §11.6). Because you built it live, they can rotate the real thing while
    reading your numbers.
 7. **Write a `.py` file only if asked** (§7.1), and say plainly whether anything
    was saved to disk.
@@ -398,6 +427,34 @@ folder, for the same reason. Worked examples already follow this shape, e.g.
   case where you satisfied the letter of a correction while breaking a
   neighbouring one.
 
+### 8.1 Handover report
+
+End every build with a findings table. Every check gets one of four statuses:
+
+| Status | Means |
+|---|---|
+| `pass` | Measured in the built document, and within the target |
+| `fail` | Measured, and outside the target. Fix it, or say why it stands |
+| `review` | A judgement, not a measurement: an open port that should be a free end, a 1 mm drawing disagreement absorbed into a pipe (Golden Rule 7), a fabrication rule applied without a job spec |
+| `unverified` | Not checked, because data was missing or the check could not run. Say what was missing |
+
+| Check | Measured | Target | Source | Status |
+|---|---|---|---|---|
+| Joint closures (16) | max gap 0.000000 mm, dot −1.000000 | 0, −1 | §10.2 | pass |
+| Valves aligned in X | dX 0.000000 mm | 0 | user prompt | pass |
+| Pipe P4 cut length | 457.2 mm (drawing 458) | drawing ±1 mm | iso, §9.2.2 | review |
+| Flange bolt-hole straddle | — | 2-hole | §4.1 | unverified: no job spec |
+
+`piping_checks` returns rows in exactly this form (§10.2). Add the
+constraint checks the user stated, and the take-out reconciliation. Then:
+- **Name the source of every target**: the prompt, the drawing, a table, or
+  a working rule from this skill. Do not invent a limit to have something to
+  check against.
+- **End with a coverage line**: which of the §8 checks you ran, and which
+  you did not.
+- A `fail` is never rounded up to a `pass`. A row you could not measure is
+  `unverified`, not left out.
+
 ---
 
 ## 10. Build and verify over MCP
@@ -430,17 +487,41 @@ user address parts in later calls.
 ### 10.2 Verify numerically — this is the part that matters
 
 A build that raised no exception has proved almost nothing. Query the finished
-document in a **separate call** and print numbers you can quote:
+document in a **separate call** and print numbers you can quote. The checks
+are in [`piping_checks.py`](../../piping_checks.py) at the repo root. Load it
+once per session (and again after a FreeCAD restart), then run it on the
+document:
 
 ```python
-def wpos(o, i): return o.Placement.multVec(o.Ports[i])
-def wdir(o, i): return o.Placement.Rotation.multVec(o.PortDirections[i]).normalize()
+import sys, importlib
+sys.path.insert(0, REPO)                  # the repo root, holding piping_checks.py
+import piping_checks as pc; importlib.reload(pc)
 
-for name, a, ia, b, ib in joints:
-    gap = (wpos(a, ia) - wpos(b, ib)).Length
-    dot = wdir(a, ia).dot(wdir(b, ib))
-    print("%-24s gap=%.6f mm  dot=%+.6f" % (name, gap, dot))   # want 0.000000, -1.000000
+joints, open_ports = pc.auto_joints(doc.Objects)
+rows  = pc.joint_report(joints)               # every mated pair of ports
+rows += pc.open_port_report(open_ports)       # free ends, and near misses
+rows += pc.interference_report(doc.Objects, joints)
+counts = pc.summary(rows)                     # want fail == 0
 ```
+
+`auto_joints` pairs every port with the ports that sit on it, so you don't
+have to list the joints. It uses world placements, so it also works inside
+spool `App::Part` containers (§14). Each check returns rows with a status of
+`pass`, `fail`, `review` or `unverified`. They go straight into the handover
+report (§8.1).
+- **A port with nothing on it is a `review`.** Say what each one is: a
+  bevel end, a blind face, a vent outlet, a branch left for later.
+- **Two open ports facing each other within 100 mm are a `fail`**, a joint
+  that missed. A gap larger than 0.01 mm never pairs as a joint, so this is
+  where a misplaced part shows up.
+
+Tested on the repo examples:
+- the 8" elbow spool: 4 joints, all pass;
+- the 4" in-line spool: 16 joints including gaskets and stud sets, all pass;
+- the pig-launcher header: 106 joints, all pass.
+
+Moving one pipe 3 mm and one stud set 2 mm produced two near-miss fails, a
+clash and an unequal stud-set review.
 
 **Print what you want to see, or end the call on a bare expression.** When a
 call's last statement is not an expression, the bridge reports the value of a
@@ -467,7 +548,7 @@ Four MCP tools do the rest without any code of yours:
 | Tool | Use |
 |---|---|
 | `geometric_verification` `verify_no_self_intersection` | Per-object OCCT validity |
-| `spatial_query` `batch_interference` | All pairs at once |
+| `spatial_query` `batch_interference` | All pairs at once. It needs an explicit `objects` list; an empty one is refused. For a whole model, `pc.interference_report` above is quicker and classifies the artefacts below for you (213 objects on the launcher header in about 9 s) |
 | `spatial_query` `clearance` / `alignment_check` | A stated gap or alignment (§9.7) |
 | `measurement_operations` `find_root_cause` | A check failed on something built from several inputs (an `App::Part`, a compound): names the part that introduced the defect, not the container that inherited it |
 
@@ -488,8 +569,10 @@ the same number:
 | SW pipe ↔ socket fitting (incl. a socket union) | ≈ 1 mm³ (0.7–1.2 at DN25) | Pipe-table OD 33.401 vs fitting-table socket 33.4 |
 | `U-Bolt` ↔ support `Beam` | `2·π·(d/2)²·tf`, e.g. 1429.4 mm³ at DN50 on a W6x15 | The legs pass through the top flange, which has no bolt holes cut. A larger value means the legs are in the web (§3.5) |
 
-Recognise them by that symmetry and repetition. Mention them once in the
-report as table artefacts, and move on. Anything that is **not** one of these
+Recognise them by that symmetry and repetition. `pc.interference_report`
+does this for you: it passes the first three, and compares the two sides of
+every stud set. It marks the U-bolt case `review`, so check the volume against
+the formula. Mention them once in the report as table artefacts, and move on. Anything that is **not** one of these
 (a different volume, a non-adjacent pair, one side of a joint only) is a real
 clash and needs finding. `common().BoundBox` of the pair says where. A
 valve's gearbox against a pipe nearby is the usual culprit (§3.2.1).

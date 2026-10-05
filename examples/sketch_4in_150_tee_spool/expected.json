@@ -1,0 +1,23 @@
+{
+  "case": "sketch_4in_150_tee_spool",
+  "source": "pencil sketch: IMG_2618.jpg",
+  "reference": "make_sketch_4in_150_tee_spool.FCStd",
+  "parts": {
+    "Elbow DN100 SCH-STD": 1,
+    "Flange DN100 No rating 150lb": 1,
+    "Flange DN100 SCH-STD 150lb": 2,
+    "Pipe DN100 SCH-STD": 2,
+    "Tee DN100 SCH-STD": 1
+  },
+  "pipe_length": {
+    "DN100": 1111.8
+  },
+  "joints": 6,
+  "joints_failing": 0,
+  "open_ends": 3,
+  "end_spans": [
+    258.518,
+    1114.072,
+    1255.173
+  ]
+}

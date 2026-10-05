@@ -1,0 +1,25 @@
+{
+  "case": "spool_4in_300_inline",
+  "source": "text prompt: header of make_4in_300_inline_spool.py",
+  "reference": "make_4in_300_inline_spool.FCStd",
+  "parts": {
+    "Bolts_Nuts DN100 300lb 300lb": 2,
+    "Elbow DN100 SCH-STD": 1,
+    "Flange DN100 No rating 300lb": 3,
+    "Flange DN100 SCH-40 300lb": 1,
+    "Gasket DN100 300lb 300lb": 2,
+    "Outlet DN25 3000lb": 1,
+    "Pipe DN100 SCH-40": 2
+  },
+  "pipe_length": {
+    "DN100": 2743.2
+  },
+  "joints": 16,
+  "joints_failing": 0,
+  "open_ends": 3,
+  "end_spans": [
+    537.245,
+    2128.24,
+    2346.918
+  ]
+}

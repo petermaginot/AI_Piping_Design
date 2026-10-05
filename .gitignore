@@ -5,6 +5,14 @@
 # client drawings, site models. See AGENTS.md.
 private/
 
+# Raw site scans and their parse caches (scan-to-model skill). Scans of real
+# sites are private; keep them out even if copied in by mistake.
+*.dae
+*.e57
+*.las
+*.laz
+*.npz
+
 __pycache__/
 *.py[cod]
 

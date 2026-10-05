@@ -354,6 +354,10 @@ mark 6   no balloon (NOT DRAWN - welded part missing from the container!)
 ```
 - **The unit schema**, named explicitly (§11.3).
 
+Report these checks in the status table of `quetzal-piping` §8.1. Each check
+is `pass`, `fail`, `review` or `unverified`, with the source of its target.
+The visual check below is `review` until you have looked at the render.
+
 Then look at it. Export the page or grab the view:
 
 ```python

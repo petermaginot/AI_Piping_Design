@@ -2,6 +2,9 @@
 
 Part of the `quetzal-piping` skill. Section numbers (§) are shared across the skill's files; `SKILL.md` has the table saying which file holds which section.
 
+For a **receiver**, read this file and then its companion,
+[pig-receiver.md](pig-receiver.md) (§13.2).
+
 ---
 
 ## 13. Worked assembly: a pig launcher

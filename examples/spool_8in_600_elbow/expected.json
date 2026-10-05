@@ -1,0 +1,20 @@
+{
+  "case": "spool_8in_600_elbow",
+  "source": "text prompt: header of make_spool_8in_600_elbow.py",
+  "reference": "make_spool_8in_600_elbow.FCStd",
+  "parts": {
+    "Elbow DN200 SCH-STD": 1,
+    "Flange DN200 No rating 600lb": 1,
+    "Flange DN200 SCH-STD 600lb": 1,
+    "Pipe DN200 SCH-STD": 2
+  },
+  "pipe_length": {
+    "DN200": 1524.0
+  },
+  "joints": 4,
+  "joints_failing": 0,
+  "open_ends": 2,
+  "end_spans": [
+    1645.406
+  ]
+}

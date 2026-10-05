@@ -1,6 +1,6 @@
 # Instructions for an AI agent working in this repo
 
-The instructions live in three skills under [`skills/`](skills/). If your agent
+The instructions live in five skills under [`skills/`](skills/). If your agent
 loads skills, they trigger on their own. If it does not, open the one that fits
 the task and follow it before you build anything:
 
@@ -9,6 +9,8 @@ the task and follow it before you build anything:
 | Build or modify piping with Quetzal | [`skills/quetzal-piping/SKILL.md`](skills/quetzal-piping/SKILL.md) |
 | Make a TechDraw drawing of a model, or a construction isometric (Quetzal-generated, NTS, from the model or a PCF) | [`skills/techdraw-drawing/SKILL.md`](skills/techdraw-drawing/SKILL.md) |
 | Make 2D artwork with Draft | [`skills/draft-2d/SKILL.md`](skills/draft-2d/SKILL.md) |
+| Animate a model: an installation sequence, a valve line-up or lockout, removing or moving parts | [`skills/animation/SKILL.md`](skills/animation/SKILL.md) |
+| Turn a 3D scan mesh of a site or building into a simplified FreeCAD model, calibrated to a survey, or mock up a proposed change on one | [`skills/scan-to-model/SKILL.md`](skills/scan-to-model/SKILL.md) |
 
 Each `SKILL.md` has a table that says which of its `references/` files to read,
 and when. Read every file it marks as required before you write build code.
