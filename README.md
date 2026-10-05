@@ -1,15 +1,12 @@
 # AI Piping Design
 
-Guidelines for using AI large language models for piping design in CAD programs.
-
-This repo contains instructions and worked examples for an AI agent that builds piping designs in CAD software. The AI agent can be directed from a written prompt, a hand-drawn isometric sketch, a pre-existing drawing, or a photograph of the real thing. Examples here
-use FreeCAD, a free open-source CAD program, with the Quetzal piping design workbench, but
-the techniquies could also be applied to AutoCAD or any other commercial piping design software
+This repo contains skill files, instructions, and worked examples for an AI agent that builds piping designs in CAD software. The AI agent can be directed from a written prompt, a hand-drawn isometric sketch, a pre-existing drawing, or a photograph of the real thing. Examples here use FreeCAD, a free open-source CAD program, with the Quetzal piping design workbench, but
+the techniques could also be applied to AutoCAD or any other commercial piping design software
 that allows the use of macros or the model context protocol to allow the AI to direct the software.
 
 Large language models are surprisingly capable of interpreting drawings and pictures to figure out the geometry
 of the piping arrangement you're trying to model but they need some guidelines so to interpret things correctly.
-For example, they need to be told to read dimensions to work points rather than to cut lengths, need to know when
+For example, they need to be told to read dimensions to work points rather than to cut lengths on standard piping construction drawings, need to know when
 fittings are chained back-to-back rather than having tiny pipe pup slivers that don't meet minimum weld spacing
 when they misinterpret the dimensions by an inch or so, and need to be told to re-check after building to make sure the modeled dimensions match the given dimensions. The modelling guidelines are packaged as an agent skill at
 [`skills/quetzal-piping/`](skills/quetzal-piping/SKILL.md).
@@ -54,7 +51,7 @@ under `freecadcmd`. The TechDraw and Draft guides were checked against FreeCAD 1
 ## Pointing this repo at your Quetzal installation
 
 Nothing in this repo supplies Quetzal's dimension tables; they are read live from
-wherever Quetzal is installed. [`quetzal_env.py`](quetzal_env.py) finds it, in
+wherever Quetzal version is installed. [`quetzal_env.py`](quetzal_env.py) finds it, in
 this order:
 
 1. the `QUETZAL_DIR` environment variable;
