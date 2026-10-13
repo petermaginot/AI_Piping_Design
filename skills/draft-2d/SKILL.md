@@ -95,6 +95,11 @@ print("open documents:", {n: (d.FileName, FreeCADGui.getDocument(n).Modified)
 print("bridge autosave:", FreeCAD.ParamGet(
     "User parameter:BaseApp/Preferences/Mod/AICopilot"
 ).GetBool("AutoSaveBeforeRiskyOp", True))
+try:                                # False = an older autosave, see below
+    from handlers.base import AUTOSAVE_OUTCOMES
+    print("autosave skips clean docs:", "unchanged" in AUTOSAVE_OUTCOMES)
+except Exception:
+    print("autosave skips clean docs: False (could not check)")
 print("__name__:", __name__)        # "builtins" = an older AICopilot
 ```
 
@@ -104,9 +109,10 @@ then carries `"autosave": "saved: <path>"`. The AICopilot preference
 `AutoSaveBeforeRiskyOp` controls this, and it defaults to on. Your own freshly
 created build document has no path, so it is safe until `save()` (§11). A user's
 file that happens to be active is safe until something changes it. An older
-AICopilot (`__name__` prints `"builtins"`) saves the active document on every
-call, changed or not, without saying so. If autosave is on and one of the user's
-saved files has unsaved changes (on an older build: if one is open at all),
+autosave (`autosave skips clean docs` prints `False`, as on stock blwfish v8.3.0
+and earlier; don't go by `__name__`) saves the active document on every call,
+changed or not, without saying so. If autosave is on and one of the user's
+saved files has unsaved changes (with an older autosave: if one is open at all),
 **stop and tell them**. Offer to switch it off
 (`.SetBool("AutoSaveBeforeRiskyOp", False)`), do it only if they agree, and
 never activate their document yourself.
@@ -370,8 +376,8 @@ exercises the export path that §10 says is the one that breaks.
 
 After `saveAs` the document has a path. With the bridge's autosave on (§2),
 any later change to it is written back to the `.FCStd` on the next call while
-that document is active. Read-only checks leave it alone, except on an older
-AICopilot, where every call rewrites it. Close or recreate it (the §3 loop
+that document is active. Read-only checks leave it alone, except with an older
+autosave (§2), where every call rewrites it. Close or recreate it (the §3 loop
 already does) before changing anything, or expect the extra git diff.
 
 Report the paths you wrote, and say plainly whether anything was staged or

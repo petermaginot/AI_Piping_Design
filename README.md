@@ -46,7 +46,7 @@ The skills are written for a build of the AICopilot add-on that:
 - returns screenshots as images;
 - sets `__name__` to `"__main__"`.
 
-Stock blwfish v8.2.2 and earlier do none of these. The skills detect such an install in their session preamble and fall back to working around it.
+Stock blwfish v8.3.0 and later return screenshots as images and set `__name__`; v8.2.3 and earlier do neither. The autosave change is in [blwfish PR #102](https://github.com/blwfish/freecad-mcp/pull/102) and is not in a stock release yet. The skills check for each separately in their session preamble and work around whatever is missing.
 
 Quetzal's `execute()` methods write to `fp.ViewObject`, so `Pipe`, `Flange` and
 friends only build geometry when a GUI ViewObject exists. Headless `freecadcmd`

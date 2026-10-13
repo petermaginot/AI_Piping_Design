@@ -155,7 +155,12 @@ print("docs:", {n: (d.FileName, FreeCADGui.getDocument(n).Modified)   # path, un
 print("bridge autosave:", FreeCAD.ParamGet(
     "User parameter:BaseApp/Preferences/Mod/AICopilot"
 ).GetBool("AutoSaveBeforeRiskyOp", True))                  # see §2.1
-print("__name__:", __name__)        # "builtins" = an older AICopilot, see §2.1
+try:                                # False = an older autosave, see §2.1
+    from handlers.base import AUTOSAVE_OUTCOMES
+    print("autosave skips clean docs:", "unchanged" in AUTOSAVE_OUTCOMES)
+except Exception:
+    print("autosave skips clean docs: False (could not check)")
+print("__name__:", __name__)        # "builtins" = an older AICopilot, see §2.2
 ```
 
 ### 2.1 Choose the target document deliberately
@@ -180,15 +185,18 @@ rewritten, and a new, unsaved document is never touched. When a save happens, th
 tool response carries an `"autosave": "saved: <path>"` field; read it. The
 AICopilot preference `AutoSaveBeforeRiskyOp` controls this, and it defaults to on.
 
-**An older AICopilot saves the active document on every call, changed or not,
-and does not report it.** The preamble tells you which one you have: `__name__`
-prints `"__main__"` on a current build and `"builtins"` on an older one. On an
-older build, any saved file that becomes active is rewritten by your next call.
-So:
+**An older autosave saves the active document on every call, changed or not,
+and does not report it.** The preamble tells you which one you have: `autosave
+skips clean docs` prints `True` for the behaviour above and `False` for the
+older one. Don't judge this by `__name__`: stock blwfish v8.3.0 prints
+`"__main__"` but still has the older autosave (the fix is
+[blwfish PR #102](https://github.com/blwfish/freecad-mcp/pull/102)). With an
+older autosave, any saved file that becomes active is rewritten by your next
+call. So:
 
 - Read the preference and each document's unsaved-changes flag in the preamble
   (§2). If autosave is on and one of the user's saved files has unsaved changes
-  (on an older build: if any open document has a `FileName`), **stop and tell
+  (with an older autosave: if any open document has a `FileName`), **stop and tell
   the user** before building. Offer to switch it off
   (`FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/AICopilot")
   .SetBool("AutoSaveBeforeRiskyOp", False)`), and do it only if they agree.
@@ -208,8 +216,8 @@ So:
   That is enough to plan an addition to an existing model before the first
   `execute_python`.
 - Once you `saveAs` a document into the repo, every later call that follows a
-  change to it re-saves it while it stays active. Read-only checks don't (on an
-  older build they do). Make further changes in a scratch document, or accept the
+  change to it re-saves it while it stays active. Read-only checks don't (with an
+  older autosave they do). Make further changes in a scratch document, or accept the
   resulting git diff.
 - **Create your build document with `view_control` `create_document` *before*
   the first `execute_python`.** The new, unsaved document becomes the active
@@ -233,7 +241,7 @@ So:
   changes, stop and ask.
 - **When you save a build, make `saveAs` the last call that changes it.** From
   then on, a call after any change re-saves the file first. Checks and
-  screenshots after the save are fine, but on an older build every call
+  screenshots after the save are fine, but with an older autosave every call
   re-saves, so run them before the save there. Save a correction round beside
   the user's file under a new name, such as `..._rev1.FCStd`, unless they asked
   you to overwrite it. Their copy may be untracked, with nothing in git to

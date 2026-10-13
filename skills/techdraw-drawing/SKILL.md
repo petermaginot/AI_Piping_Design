@@ -187,14 +187,21 @@ print(FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/AICopilot")
       .GetBool("AutoSaveBeforeRiskyOp", True))
 print({n: (d.FileName, FreeCADGui.getDocument(n).Modified)
        for n, d in FreeCAD.listDocuments().items()})
+try:                # False = an older autosave
+    from handlers.base import AUTOSAVE_OUTCOMES
+    print("autosave skips clean docs:", "unchanged" in AUTOSAVE_OUTCOMES)
+except Exception:
+    print("autosave skips clean docs: False (could not check)")
 print(__name__)     # "builtins" = an older AICopilot
 ```
 
-**An older AICopilot (`__name__` prints `"builtins"`) saves the active document
-on every call, changed or not, and doesn't report it.**
+**An older autosave (`autosave skips clean docs` prints `False`) saves the
+active document on every call, changed or not, and doesn't report it.** Stock
+blwfish v8.3.0 still has it, even though its `__name__` prints `"__main__"`, so
+don't go by `__name__` here.
 
-If autosave is on and one of the user's saved files has unsaved changes (on an
-older build: if one is open at all), **stop and tell them**. Offer to switch it
+If autosave is on and one of the user's saved files has unsaved changes (with an
+older autosave: if one is open at all), **stop and tell them**. Offer to switch it
 off (`.SetBool("AutoSaveBeforeRiskyOp", False)`), and do it only if they agree.
 Either way, read their document through `find_doc` (§2.1) without activating it.
 The repo document you are drawing on is saved after every call that changes it,

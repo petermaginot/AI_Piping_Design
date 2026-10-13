@@ -41,7 +41,8 @@ keeps home placements in the document, and plays through `anim_tools.Player`.
 1. **Confirm the session** (`check_freecad_connection`, then the
    quetzal-piping §2 preamble). List every open document with its
    `FileName` and `Modified` flag, and note which one is **active**. If the
-   active document is a saved file **with unsaved changes**, your first
+   active document is a saved file **with unsaved changes** (with an older
+   autosave, quetzal-piping §2.1: any saved file), your first
    `execute_python` will autosave it, even a read-only call. Stop and tell
    the user. Make a scratch document active first (`view_control
    create_document`) whenever you are unsure.
@@ -115,7 +116,8 @@ keeps home placements in the document, and plays through `anim_tools.Player`.
 ## Pitfalls that have already cost a round
 
 - **Autosave of the user's active document.** The bridge saves the active
-  document before each call if it has a path and unsaved changes. Check
+  document before each call if it has a path and unsaved changes (with an
+  older autosave, whether changed or not: quetzal-piping §2.1). Check
   which document is active and whether it is modified *before* the first
   call. Git can restore a tracked file.
 - **Moving or renaming files that FreeCAD has open.** FreeCAD re-saves them

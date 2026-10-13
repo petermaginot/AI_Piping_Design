@@ -13,12 +13,11 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILLS = os.path.join(ROOT, "skills")
 
-# Every tracked file must stay under this.  Two existing source files (a mesh
-# and an annotated photo PDF) are larger; they are listed so that nothing new
-# of that size slips in unnoticed.
+# Every tracked file must stay under this.  One existing source file (an
+# annotated photo PDF) is larger; it is listed so that nothing new of that
+# size slips in unnoticed.
 MAX_BYTES = 5 * 1024 * 1024
 LARGE_FILE_ALLOWLIST = {
-    "examples/mesh_example/Piping_Model_2.glb",
     "examples/photo_example/Annotoated_photo_1.pdf",
 }
 

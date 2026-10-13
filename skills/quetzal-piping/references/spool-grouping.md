@@ -208,7 +208,7 @@ Report, briefly:
 - every judgement call: where supports went, where shared tie-in material went,
   what a spool that spans a flange break was left as;
 - that nothing was saved, or which files the bridge's autosave wrote (each
-  call's `autosave` field). On an older AICopilot, which doesn't report saves,
+  call's `autosave` field). With an older autosave, which doesn't report saves,
   say that autosave was on and may already have written the user's file (§2.1);
 - that the change is one undo.
 

@@ -29,7 +29,8 @@ The code lives in [`scan_tools.py`](../../scan_tools.py) at the repo root
 1. **Confirm the session.** Run `check_freecad_connection`, then list the open
    documents (`FileName`, modified flag, which is active). A scan opened from
    a .dae is usually an unsaved document, so there is no autosave risk. If
-   the active document is a saved file with changes, stop and say so (see
+   the active document is a saved file with changes (with an older autosave:
+   any saved file), stop and say so (see
    the autosave rule in `quetzal-piping` §2.1).
 2. **Probe the mesh in the session** (facet count, bounding box, a height
    histogram, a coarse plan grid). Then read the source file yourself

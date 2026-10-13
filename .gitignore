@@ -13,6 +13,11 @@ private/
 *.laz
 *.npz
 
+# Site photos and the scan texture for the mesh example: too large to commit,
+# and not read by make_mesh_example.py. Kept local only.
+examples/mesh_example/*.png
+examples/mesh_example/*.jpg
+
 __pycache__/
 *.py[cod]
 
