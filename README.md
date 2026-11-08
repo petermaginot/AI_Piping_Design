@@ -30,6 +30,9 @@ Right now, this repo supports FreeCAD, driven over MCP and the following workben
 The methodology is not FreeCAD-specific and the intent is to generalize it to
 other piping CAD packages, but nothing here is abstracted for that yet.
 
+P&IDs are in a companion repo, [AI_PID](https://github.com/petermaginot/AI_PID): a skill and symbol
+library for drawing P&IDs as hand-editable draw.io files.
+
 ## Prerequisites
 
 | | |
